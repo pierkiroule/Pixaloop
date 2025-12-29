@@ -632,55 +632,58 @@ function App() {
           )}
         </div>
 
-        {imageUrl && !isAnimating && (
-          <div className="toolbar">
-            <div className="toolbar-group">
-              <button className={`tool ${tool === 'flow' ? 'active' : ''}`} type="button" onClick={() => setTool('flow')}>
-                <Wind size={20} /> Flux
-              </button>
-              <button className={`tool ${tool === 'anchor' ? 'active' : ''}`} type="button" onClick={() => setTool('anchor')}>
-                <Anchor size={20} /> Ancre
-              </button>
-            </div>
-            <div className="toolbar-divider" />
-            <div className="toolbar-actions">
-              <button className="icon" type="button" title="Export 2D Loop" onClick={() => startRecording('2D')}>
-                <Camera size={22} />
-              </button>
-              <button className="icon" type="button" title="Record 360 Skybox Loop" onClick={() => startRecording('360')}>
-                <Globe size={22} />
-              </button>
-              <button
-                className={`icon ${vrEnabled ? 'active' : ''}`}
-                type="button"
-                title="Basculer bulle VR A-Frame"
-                onClick={() => setVrEnabled((prev) => !prev)}
-              >
-                <Sparkles size={20} />
-              </button>
-              <button className="icon" type="button" title="Reset Canvas" onClick={() => { setPaths([]); setAnchors([]); }}>
-                <Trash2 size={22} />
-              </button>
-            </div>
-          </div>
-        )}
-
         {imageUrl && (
-          <div className="filter-rail">
-            {FILTERS.map((filter) => {
-              const Icon = ICONS[filter.icon] || ImageIcon;
-              return (
-                <button
-                  key={filter.id}
-                  type="button"
-                  className={`filter ${filterType === filter.id ? 'active' : ''}`}
-                  onClick={() => setFilterType(filter.id)}
-                  title={filter.label}
-                >
-                  <Icon size={18} />
-                </button>
-              );
-            })}
+          <div className="controls-shell">
+            {!isAnimating && (
+              <div className="toolbar">
+                <div className="toolbar-group">
+                  <button className={`tool ${tool === 'flow' ? 'active' : ''}`} type="button" onClick={() => setTool('flow')}>
+                    <Wind size={20} /> Flux
+                  </button>
+                  <button className={`tool ${tool === 'anchor' ? 'active' : ''}`} type="button" onClick={() => setTool('anchor')}>
+                    <Anchor size={20} /> Ancre
+                  </button>
+                </div>
+                <div className="toolbar-divider" />
+                <div className="toolbar-actions">
+                  <button className="icon" type="button" title="Export 2D Loop" onClick={() => startRecording('2D')}>
+                    <Camera size={22} />
+                  </button>
+                  <button className="icon" type="button" title="Record 360 Skybox Loop" onClick={() => startRecording('360')}>
+                    <Globe size={22} />
+                  </button>
+                  <button
+                    className={`icon ${vrEnabled ? 'active' : ''}`}
+                    type="button"
+                    title="Basculer bulle VR A-Frame"
+                    onClick={() => setVrEnabled((prev) => !prev)}
+                  >
+                    <Sparkles size={20} />
+                  </button>
+                  <button className="icon" type="button" title="Reset Canvas" onClick={() => { setPaths([]); setAnchors([]); }}>
+                    <Trash2 size={22} />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="filter-rail">
+              {FILTERS.map((filter) => {
+                const Icon = ICONS[filter.icon] || ImageIcon;
+                return (
+                  <button
+                    key={filter.id}
+                    type="button"
+                    className={`filter ${filterType === filter.id ? 'active' : ''}`}
+                    onClick={() => setFilterType(filter.id)}
+                    title={filter.label}
+                  >
+                    <Icon size={18} />
+                    <span className="filter-label">{filter.label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 

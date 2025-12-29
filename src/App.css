@@ -110,14 +110,16 @@ body {
 .stage {
   flex: 1;
   position: relative;
-  padding: 28px;
-  display: grid;
-  place-items: center;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: center;
 }
 
 .canvas-area {
   position: relative;
-  width: min(1200px, 94vw);
+  width: min(1080px, 98vw);
   aspect-ratio: 1;
   display: flex;
   align-items: center;
@@ -328,22 +330,34 @@ body {
   box-shadow: 0 12px 30px rgba(99, 102, 241, 0.35);
 }
 
+.controls-shell {
+  width: min(1080px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  position: sticky;
+  bottom: 12px;
+  z-index: 5;
+}
+
 .filter-rail {
-  position: absolute;
-  left: 22px;
-  bottom: 110px;
+  width: 100%;
   display: grid;
-  gap: 12px;
-  padding: 10px;
-  background: rgba(7, 7, 10, 0.82);
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(72px, 1fr);
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(7, 7, 10, 0.9);
   border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  overflow-x: auto;
 }
 
 .filter {
-  width: 48px;
-  height: 48px;
+  min-width: 70px;
+  height: 52px;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.02);
@@ -351,8 +365,17 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   cursor: pointer;
+  padding: 0 10px;
   transition: transform 120ms ease, background 150ms ease, color 150ms ease, border 150ms ease;
+}
+
+.filter-label {
+  display: none;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
 .filter.active {
@@ -360,7 +383,7 @@ body {
   color: #0f172a;
   border-color: #fff;
   box-shadow: 0 16px 30px rgba(255, 255, 255, 0.25);
-  transform: scale(1.08);
+  transform: translateY(-1px);
 }
 
 .filter:hover {
@@ -457,9 +480,9 @@ body {
 }
 
 .vr-shell {
-  margin-top: 22px;
-  width: min(1180px, 96vw);
-  padding: 16px;
+  margin-top: 8px;
+  width: min(1180px, 100%);
+  padding: 14px;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.06);
@@ -498,4 +521,51 @@ body {
   height: 420px;
   border-radius: 14px;
   overflow: hidden;
+}
+
+@media (min-width: 900px) {
+  .stage {
+    padding: 24px 28px;
+    gap: 18px;
+  }
+
+  .canvas-area {
+    width: min(1200px, 94vw);
+  }
+
+  .controls-shell {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .filter-rail {
+    width: auto;
+    grid-auto-flow: row;
+    grid-auto-columns: unset;
+    grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+    max-height: 320px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 14px;
+    position: relative;
+    background: rgba(7, 7, 10, 0.82);
+  }
+
+  .filter {
+    justify-content: center;
+    flex-direction: column;
+    gap: 6px;
+    height: 66px;
+  }
+
+  .filter-label {
+    display: block;
+    text-align: center;
+  }
+
+  .controls-shell .toolbar {
+    position: static;
+    transform: none;
+  }
 }
