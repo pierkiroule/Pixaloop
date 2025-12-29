@@ -352,10 +352,12 @@ function App() {
 
     if (tool === 'anchor') {
       setAnchors((prev) => [...prev, { x, y }]);
-    } else {
-      setIsDrawing(true);
-      setPaths((prev) => [...prev, [{ x, y }]]);
+      return;
     }
+
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setIsDrawing(true);
+    setPaths((prev) => [...prev, [{ x, y }]]);
   };
 
   const handlePointerMove = (event) => {
@@ -367,16 +369,23 @@ function App() {
     setPaths((prev) => {
       const updated = [...prev];
       const current = updated[updated.length - 1];
+      if (!current) return prev;
       const lastPoint = current[current.length - 1];
       const dist = Math.hypot(x - lastPoint.x, y - lastPoint.y);
       if (dist > 0.005) {
         current.push({ x, y });
+        return updated;
       }
-      return updated;
+      return prev;
     });
   };
 
-  const handlePointerUp = () => setIsDrawing(false);
+  const stopDrawing = (event) => {
+    if (event?.currentTarget?.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    setIsDrawing(false);
+  };
 
   return (
     <div className="app-shell">
@@ -405,7 +414,8 @@ function App() {
           className="canvas-area"
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
+          onPointerUp={stopDrawing}
+          onPointerCancel={stopDrawing}
         >
           {imageUrl ? (
             <div className="canvas-stack">
