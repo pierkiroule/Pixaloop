@@ -20,6 +20,44 @@ const FILTERS = [
   { id: 10, label: 'Electric Silk', icon: 'wind' },
 ];
 
+const FX_PARTICLES = [
+  {
+    id: 'aurora',
+    name: 'Aurora Veil',
+    config: 'preset: dust; particleCount: 2400; size: 1.2; color: #22d3ee, #6366f1; opacity: 0.42; velocityValue: 0 0 -0.3; velocitySpread: 0.16 0.04 0.16; positionSpread: 10 2 10',
+    position: '0 2.2 -4',
+    rotation: '0 20 0',
+  },
+  {
+    id: 'embers',
+    name: 'Solar Embers',
+    config: 'preset: default; particleCount: 1800; size: 1.1; color: #f97316, #fde68a; opacity: 0.6; direction: -1; velocityValue: 0 1.4 0; velocitySpread: 0.3 0.6 0.3; positionSpread: 4 0.5 4',
+    position: '0 1 -1.8',
+    rotation: '0 0 0',
+  },
+  {
+    id: 'stardust',
+    name: 'Stardust Wave',
+    config: 'preset: stars; particleCount: 4200; size: 0.9; color: #a855f7, #c084fc, #67e8f9; opacity: 0.55; velocityValue: 0 0 -0.6; velocitySpread: 0.25 0.1 0.25; positionSpread: 14 5 14',
+    position: '0 3 -6',
+    rotation: '0 12 0',
+  },
+  {
+    id: 'ion',
+    name: 'Ion Trails',
+    config: 'preset: fountain; particleCount: 2600; size: 1.3; color: #0ea5e9, #22c55e; opacity: 0.55; direction: -1; velocityValue: 0 1.6 0; velocitySpread: 0.1 0.2 0.1; accelerationValue: 0 -0.3 0; accelerationSpread: 0.05 0.1 0.05',
+    position: '-1.5 1.4 -2.4',
+    rotation: '0 -10 0',
+  },
+  {
+    id: 'spiral',
+    name: 'Nebula Spiral',
+    config: 'preset: snow; particleCount: 3400; size: 1.15; color: #f472b6, #fca5a5, #fde047; opacity: 0.48; velocityValue: 0 0.2 -0.35; velocitySpread: 0.2 0.2 0.2; positionSpread: 8 3 8',
+    position: '1.6 2.4 -3',
+    rotation: '0 16 0',
+  },
+];
+
 const ICONS = {
   image: ImageIcon,
   zap: Zap,
@@ -165,6 +203,7 @@ function App() {
   const [recordProgress, setRecordProgress] = useState(0);
   const [recordType, setRecordType] = useState('2D');
   const [vrEnabled, setVrEnabled] = useState(false);
+  const [fxEnabled, setFxEnabled] = useState(() => Object.fromEntries(FX_PARTICLES.map((fx) => [fx.id, true])));
 
   const canvasRef = useRef(null);
   const masterCanvasRef = useRef(null);
@@ -471,18 +510,37 @@ function App() {
 
   const ensureAFrameLoaded = useCallback(() => {
     if (aframeReady.current) return aframeReady.current;
-    aframeReady.current = new Promise((resolve, reject) => {
-      if (window.AFRAME) {
+    const loadScript = (src) => new Promise((resolve, reject) => {
+      const existing = document.querySelector(`script[src="${src}"]`);
+      if (existing?.dataset?.loaded === 'true') {
         resolve();
         return;
       }
+      if (existing) {
+        existing.addEventListener('load', resolve, { once: true });
+        existing.addEventListener('error', reject, { once: true });
+        return;
+      }
       const script = document.createElement('script');
-      script.src = 'https://aframe.io/releases/1.5.0/aframe.min.js';
+      script.src = src;
       script.async = true;
-      script.onload = () => resolve();
+      script.dataset.loaded = 'false';
+      script.onload = () => {
+        script.dataset.loaded = 'true';
+        resolve();
+      };
       script.onerror = reject;
       document.head.appendChild(script);
     });
+
+    aframeReady.current = (async () => {
+      if (!window.AFRAME) {
+        await loadScript('https://aframe.io/releases/1.5.0/aframe.min.js');
+      }
+      if (!window.AFRAME?.components?.['particle-system']) {
+        await loadScript('https://cdn.jsdelivr.net/gh/aframevr/aframe-particle-system-component@1.1.1/dist/aframe-particle-system-component.min.js');
+      }
+    })();
     return aframeReady.current;
   }, []);
 
@@ -724,6 +782,26 @@ function App() {
               <div className="vr-pill">VR Bubble • A-Frame</div>
               <p className="vr-note">Skybox 360 equirect + panneau 2D flottant. Autorisez le gyro sur mobile.</p>
             </div>
+            <div className="vr-fx-rail">
+              <div className="vr-fx-label">
+                <Sparkles size={14} />
+                FX Particles (toggle)
+              </div>
+              <div className="vr-fx-grid">
+                {FX_PARTICLES.map((fx) => (
+                  <button
+                    key={fx.id}
+                    type="button"
+                    className={`fx-toggle ${fxEnabled[fx.id] ? 'active' : ''}`}
+                    onClick={() => setFxEnabled((prev) => ({ ...prev, [fx.id]: !prev[fx.id] }))}
+                    title={fx.name}
+                  >
+                    <span className="fx-name">{fx.name}</span>
+                    <span className="fx-state">{fxEnabled[fx.id] ? 'ON' : 'OFF'}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
             <a-scene
               embedded
               vr-mode-ui="enabled: true"
@@ -735,18 +813,27 @@ function App() {
                 <video id="panelVideo" ref={panelVideoRef} crossOrigin="anonymous" playsInline muted loop />
               </a-assets>
 
-              <a-entity position="0 1.6 0">
+              <a-videosphere src="#skyboxVideo" radius="500" rotation="0 180 0" segments-height="64" segments-width="128" />
+              <a-entity id="viewerRig" position="0 1.6 0">
                 <a-camera wasd-controls-enabled="false" look-controls="magicWindowTrackingEnabled: true; touchEnabled: true" />
+                <a-circle
+                  src="#panelVideo"
+                  radius="1.25"
+                  position="0 0 -2.15"
+                  rotation="-2 0 0"
+                  material="side: double; transparent: true; opacity: 0.96"
+                />
               </a-entity>
 
-              <a-videosphere src="#skyboxVideo" rotation="0 180 0" segments-height="64" segments-width="128" />
-              <a-circle
-                src="#panelVideo"
-                radius="1.2"
-                position="0 1.6 -2.4"
-                rotation="-5 0 0"
-                material="side: double; transparent: true; opacity: 0.95"
-              />
+              {FX_PARTICLES.filter((fx) => fxEnabled[fx.id]).map((fx) => (
+                // eslint-disable-next-line react/no-unknown-property
+                <a-entity
+                  key={fx.id}
+                  position={fx.position}
+                  rotation={fx.rotation}
+                  particle-system={fx.config}
+                />
+              ))}
 
               <a-entity light="type: ambient; intensity: 0.35" />
               <a-entity light="type: point; intensity: 0.8; distance: 6" position="0 2 -1" />
