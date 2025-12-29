@@ -1,9 +1,10 @@
-import { Anchor, Camera, Cloud, Droplets, Globe, Image as ImageIcon, Monitor, Pause, Play, Sparkles, Stars, Trash2, Wind, Zap } from 'lucide-react';
+import { Anchor, Camera, Cloud, Droplets, Eye, Globe, Image as ImageIcon, Monitor, Pause, Play, Sparkles, Stars, Trash2, Wind, Zap } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { registerFloatingParticles } from './aframe/particles';
 import './App.css';
 
 const CANVAS_SIZE = 1024;
+const PREVIEW_SIZE = 512;
 const MASTER_WIDTH = 3840;
 const MASTER_HEIGHT = 1920;
 
@@ -166,14 +167,17 @@ function App() {
   const [recordProgress, setRecordProgress] = useState(0);
   const [recordType, setRecordType] = useState('2D');
   const [vrEnabled, setVrEnabled] = useState(false);
+  const [preview2DEnabled, setPreview2DEnabled] = useState(false);
 
   const canvasRef = useRef(null);
   const masterCanvasRef = useRef(null);
   const flowCanvasRef = useRef(null);
+  const previewCanvasRef = useRef(null);
   const imgRef = useRef(null);
   const skyboxVideoRef = useRef(null);
   const panelVideoRef = useRef(null);
   const aframeReady = useRef(null);
+  const previewFrameRef = useRef(null);
 
   const engine = useRef({
     gl: null,
@@ -400,7 +404,7 @@ function App() {
     const stream = source.captureStream(30);
     const recorder = new MediaRecorder(stream, {
       mimeType: 'video/webm;codecs=vp9',
-      videoBitsPerSecond: type === '360' ? 25_000_000 : 10_000_000,
+      videoBitsPerSecond: type === '360' ? 25000000 : 10000000,
     });
 
     const chunks = [];
@@ -530,6 +534,44 @@ function App() {
       });
   }, [vrEnabled, ensureAFrameLoaded, startVideoStream, stopVideoStream]);
 
+  const renderPreviewLayer = useCallback(() => {
+    const previewCanvas = previewCanvasRef.current;
+    const sourceCanvas = canvasRef.current;
+    if (!previewCanvas || !sourceCanvas) return;
+
+    const ctx = previewCanvas.getContext('2d');
+    ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+    ctx.globalAlpha = 0.82;
+    ctx.drawImage(sourceCanvas, 0, 0, previewCanvas.width, previewCanvas.height);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.lineWidth = 10;
+    ctx.strokeRect(8, 8, previewCanvas.width - 16, previewCanvas.height - 16);
+
+    previewFrameRef.current = requestAnimationFrame(renderPreviewLayer);
+  }, []);
+
+  useEffect(() => {
+    if (!preview2DEnabled || !imageUrl) {
+      if (previewFrameRef.current) {
+        cancelAnimationFrame(previewFrameRef.current);
+        previewFrameRef.current = null;
+      }
+      const previewCanvas = previewCanvasRef.current;
+      if (previewCanvas) {
+        previewCanvas.getContext('2d')?.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+      }
+      return undefined;
+    }
+    previewFrameRef.current = requestAnimationFrame(renderPreviewLayer);
+    return () => {
+      if (previewFrameRef.current) {
+        cancelAnimationFrame(previewFrameRef.current);
+        previewFrameRef.current = null;
+      }
+    };
+  }, [imageUrl, preview2DEnabled, renderPreviewLayer]);
+
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -624,6 +666,9 @@ function App() {
                   ))}
                 </svg>
               )}
+              {preview2DEnabled && (
+                <canvas ref={previewCanvasRef} width={PREVIEW_SIZE} height={PREVIEW_SIZE} className="preview-layer" />
+              )}
             </div>
           ) : (
             <label className="upload-drop">
@@ -664,6 +709,14 @@ function App() {
                     onClick={() => setVrEnabled((prev) => !prev)}
                   >
                     <Sparkles size={20} />
+                  </button>
+                  <button
+                    className={`icon ${preview2DEnabled ? 'active' : ''}`}
+                    type="button"
+                    title="Afficher un preview 2D léger"
+                    onClick={() => setPreview2DEnabled((prev) => !prev)}
+                  >
+                    <Eye size={20} />
                   </button>
                   <button className="icon" type="button" title="Reset Canvas" onClick={() => { setPaths([]); setAnchors([]); }}>
                     <Trash2 size={22} />
@@ -755,7 +808,7 @@ function App() {
 
               <a-entity light="type: ambient; intensity: 0.35" />
               <a-entity light="type: point; intensity: 0.8; distance: 6" position="0 2 -1" />
-              <a-entity floating-particles="density: 200; speed: 0.4; size: 0.03; color: #a8e6ff; vrOnly: true" />
+              <a-entity floating-particles="density: 200; speed: 0.4; size: 0.03; color: #a8e6ff; vrOnly: true; active: true" />
             </a-scene>
           </div>
         )}

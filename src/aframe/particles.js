@@ -11,6 +11,7 @@ export function registerFloatingParticles() {
       size: { type: 'number', default: 0.05 },
       color: { type: 'color', default: '#ffffff' },
       vrOnly: { type: 'boolean', default: false },
+      active: { type: 'boolean', default: false },
     },
 
     init() {
@@ -56,9 +57,14 @@ export function registerFloatingParticles() {
     tick(time, timeDelta) {
       if (!this.points || !this.positions || !this.velocities) return;
 
-      const { vrOnly, speed } = this.data;
+      const { vrOnly, speed, active } = this.data;
       const deltaSeconds = (timeDelta || 16) / 1000;
       const { range } = this;
+
+      if (!active) {
+        this.points.visible = false;
+        return;
+      }
 
       if (vrOnly && this.el.sceneEl) {
         this.points.visible = this.el.sceneEl.is('vr-mode');
