@@ -1,10 +1,37 @@
-import { Anchor, Camera, Cloud, Droplets, Globe, Image as ImageIcon, Monitor, Pause, Play, Stars, Trash2, Wind, Zap } from 'lucide-react';
+import { Anchor, Camera, Cloud, Droplets, Globe, Image as ImageIcon, Monitor, Pause, Play, Sparkles, Stars, Trash2, Wind, Zap } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import './App.css';
 
 const CANVAS_SIZE = 1024;
 const MASTER_WIDTH = 3840;
 const MASTER_HEIGHT = 1920;
+
+const FILTERS = [
+  { id: 0, label: 'Original', icon: 'image' },
+  { id: 1, label: 'Tricolore', icon: 'zap' },
+  { id: 2, label: 'Aurore', icon: 'cloud' },
+  { id: 3, label: 'Aquarelle', icon: 'droplets' },
+  { id: 4, label: 'Prisme', icon: 'stars' },
+  { id: 5, label: 'Nébuleuse', icon: 'sparkles' },
+  { id: 6, label: 'Verre Liquide', icon: 'droplets' },
+  { id: 7, label: 'Ghost IR', icon: 'monitor' },
+  { id: 8, label: 'Kaleido', icon: 'globe' },
+  { id: 9, label: 'Monolithe', icon: 'anchor' },
+  { id: 10, label: 'Electric Silk', icon: 'wind' },
+];
+
+const ICONS = {
+  image: ImageIcon,
+  zap: Zap,
+  cloud: Cloud,
+  droplets: Droplets,
+  stars: Stars,
+  sparkles: Sparkles,
+  monitor: Monitor,
+  globe: Globe,
+  anchor: Anchor,
+  wind: Wind,
+};
 
 const vertexShader = `
   attribute vec2 position;
@@ -69,6 +96,57 @@ const fragmentShader = `
       finalCol.b = mix(texture2D(tSource, uv1 - vec2(shift, 0.0)).b, texture2D(tSource, uv2 - vec2(shift, 0.0)).b, blend);
       float star = pow(sin(vUv.x * 400.0 + time) * cos(vUv.y * 400.0 - time), 30.0);
       finalCol.rgb += star * 0.4 * luma;
+    } else if (mode == 5) { // Nebula Pulse
+      float swirl = sin(3.1415 * (vUv.x + vUv.y) + time * 0.8) * 0.01 * active;
+      vec2 uvSwirl = vUv + flowDir * 0.02 * active + vec2(swirl, -swirl);
+      vec3 neb = texture2D(tSource, uvSwirl).rgb;
+      float glow = smoothstep(0.5, 1.0, luma) * 0.6;
+      vec3 tint = hsv2rgb(vec3(fract(time * 0.05 + luma * 0.3), 0.8, 1.2));
+      finalCol.rgb = mix(neb, tint, 0.35 * active) + glow * tint * 0.25;
+    } else if (mode == 6) { // Liquid Glass
+      float ripple = sin((vUv.x + vUv.y + time * 0.9) * 40.0) * 0.002 * active;
+      vec2 rUv = vUv + flowDir * 0.03 * active + ripple;
+      vec3 base = texture2D(tSource, rUv).rgb;
+      vec3 chroma;
+      chroma.r = texture2D(tSource, rUv + vec2(0.003, 0.0)).r;
+      chroma.g = base.g;
+      chroma.b = texture2D(tSource, rUv - vec2(0.003, 0.0)).b;
+      finalCol.rgb = mix(base, chroma, 0.6) * 1.05;
+    } else if (mode == 7) { // Ghost IR
+      float heat = pow(luma, 0.7);
+      vec3 ir = vec3(heat * 1.2, smoothstep(0.2, 0.8, heat), 1.0 - heat);
+      vec3 halo = vec3(0.6, 0.8, 1.4) * smoothstep(0.0, 0.3, 1.0 - luma) * 0.4;
+      finalCol.rgb = mix(finalCol.rgb, ir + halo, 0.8);
+    } else if (mode == 8) { // Kaleido Prism
+      vec2 center = vec2(0.5);
+      vec2 p = vUv - center;
+      float angle = atan(p.y, p.x);
+      float radius = length(p);
+      float folds = 6.0;
+      angle = mod(angle, 6.28318 / folds);
+      vec2 kUv = vec2(cos(angle), sin(angle)) * radius + center;
+      vec3 kCol = texture2D(tSource, kUv).rgb;
+      float pulse = 0.03 * sin(time * 1.1 + luma * 4.0) * active;
+      vec3 prismatic = vec3(
+        texture2D(tSource, kUv + vec2(pulse, 0.0)).r,
+        texture2D(tSource, kUv).g,
+        texture2D(tSource, kUv - vec2(pulse, 0.0)).b
+      );
+      finalCol.rgb = mix(kCol, prismatic, 0.7);
+    } else if (mode == 9) { // Void Monolith
+      float contrast = smoothstep(0.25, 0.85, luma);
+      vec3 dark = vec3(0.04, 0.05, 0.08);
+      vec3 light = vec3(1.2) * contrast;
+      float cut = smoothstep(0.45, 0.55, vUv.y + flowDir.y * 0.1);
+      finalCol.rgb = mix(dark, light, cut);
+      float tilt = smoothstep(0.3, 0.7, vUv.x + sin(time * 0.2) * 0.02);
+      finalCol.rgb = mix(finalCol.rgb, light * 1.2, tilt * 0.2);
+    } else if (mode == 10) { // Electric Silk
+      float streak = sin(vUv.y * 120.0 + time * 2.0 + flowDir.x * 20.0) * 0.5 + 0.5;
+      float streak2 = cos(vUv.x * 150.0 - time * 1.6 + flowDir.y * 24.0) * 0.5 + 0.5;
+      float energy = pow(streak * streak2, 2.0) * active;
+      vec3 trail = hsv2rgb(vec3(fract(time * 0.1 + luma * 0.6), 0.9, 1.2));
+      finalCol.rgb = mix(finalCol.rgb * 0.9, finalCol.rgb + trail * energy, 0.7);
     }
 
     gl_FragColor = finalCol;
@@ -521,21 +599,20 @@ function App() {
 
         {imageUrl && (
           <div className="filter-rail">
-            <button type="button" className={`filter ${filterType === 0 ? 'active' : ''}`} onClick={() => setFilterType(0)} title="Original">
-              <ImageIcon size={18} />
-            </button>
-            <button type="button" className={`filter ${filterType === 1 ? 'active' : ''}`} onClick={() => setFilterType(1)} title="Tricolore">
-              <Zap size={18} />
-            </button>
-            <button type="button" className={`filter ${filterType === 2 ? 'active' : ''}`} onClick={() => setFilterType(2)} title="Aurore">
-              <Cloud size={18} />
-            </button>
-            <button type="button" className={`filter ${filterType === 3 ? 'active' : ''}`} onClick={() => setFilterType(3)} title="Aquarelle">
-              <Droplets size={18} />
-            </button>
-            <button type="button" className={`filter ${filterType === 4 ? 'active' : ''}`} onClick={() => setFilterType(4)} title="Prisme">
-              <Stars size={18} />
-            </button>
+            {FILTERS.map((filter) => {
+              const Icon = ICONS[filter.icon] || ImageIcon;
+              return (
+                <button
+                  key={filter.id}
+                  type="button"
+                  className={`filter ${filterType === filter.id ? 'active' : ''}`}
+                  onClick={() => setFilterType(filter.id)}
+                  title={filter.label}
+                >
+                  <Icon size={18} />
+                </button>
+              );
+            })}
           </div>
         )}
 
