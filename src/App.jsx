@@ -164,11 +164,15 @@ function App() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordProgress, setRecordProgress] = useState(0);
   const [recordType, setRecordType] = useState('2D');
+  const [vrEnabled, setVrEnabled] = useState(false);
 
   const canvasRef = useRef(null);
   const masterCanvasRef = useRef(null);
   const flowCanvasRef = useRef(null);
   const imgRef = useRef(null);
+  const skyboxVideoRef = useRef(null);
+  const panelVideoRef = useRef(null);
+  const aframeReady = useRef(null);
 
   const engine = useRef({
     gl: null,
@@ -465,6 +469,62 @@ function App() {
     setIsDrawing(false);
   };
 
+  const ensureAFrameLoaded = useCallback(() => {
+    if (aframeReady.current) return aframeReady.current;
+    aframeReady.current = new Promise((resolve, reject) => {
+      if (window.AFRAME) {
+        resolve();
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://aframe.io/releases/1.5.0/aframe.min.js';
+      script.async = true;
+      script.onload = () => resolve();
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+    return aframeReady.current;
+  }, []);
+
+  const startVideoStream = useCallback((canvas, videoEl) => {
+    if (!canvas || !videoEl) return;
+    const stream = canvas.captureStream(30);
+    videoEl.srcObject = stream;
+    videoEl.muted = true;
+    videoEl.loop = true;
+    videoEl.playsInline = true;
+    videoEl.autoplay = true;
+    const play = () => videoEl.play().catch(() => {});
+    videoEl.addEventListener('loadeddata', play, { once: true });
+    play();
+  }, []);
+
+  const stopVideoStream = useCallback((videoEl) => {
+    if (videoEl?.srcObject) {
+      videoEl.srcObject.getTracks().forEach((t) => t.stop());
+    }
+    if (videoEl) {
+      videoEl.pause();
+      videoEl.srcObject = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!vrEnabled) {
+      stopVideoStream(skyboxVideoRef.current);
+      stopVideoStream(panelVideoRef.current);
+      return;
+    }
+    ensureAFrameLoaded()
+      .then(() => {
+        startVideoStream(masterCanvasRef.current, skyboxVideoRef.current);
+        startVideoStream(canvasRef.current, panelVideoRef.current);
+      })
+      .catch(() => {
+        setVrEnabled(false);
+      });
+  }, [vrEnabled, ensureAFrameLoaded, startVideoStream, stopVideoStream]);
+
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -590,6 +650,14 @@ function App() {
               <button className="icon" type="button" title="Record 360 Skybox Loop" onClick={() => startRecording('360')}>
                 <Globe size={22} />
               </button>
+              <button
+                className={`icon ${vrEnabled ? 'active' : ''}`}
+                type="button"
+                title="Basculer bulle VR A-Frame"
+                onClick={() => setVrEnabled((prev) => !prev)}
+              >
+                <Sparkles size={20} />
+              </button>
               <button className="icon" type="button" title="Reset Canvas" onClick={() => { setPaths([]); setAnchors([]); }}>
                 <Trash2 size={22} />
               </button>
@@ -644,6 +712,42 @@ function App() {
                 </p>
               </div>
             </div>
+          </div>
+        )}
+
+        {imageUrl && vrEnabled && (
+          <div className="vr-shell">
+            <div className="vr-header">
+              <div className="vr-pill">VR Bubble • A-Frame</div>
+              <p className="vr-note">Skybox 360 equirect + panneau 2D flottant. Autorisez le gyro sur mobile.</p>
+            </div>
+            <a-scene
+              embedded
+              vr-mode-ui="enabled: true"
+              renderer="antialias: true; colorManagement: true"
+              device-orientation-permission-ui="enabled: true"
+            >
+              <a-assets>
+                <video id="skyboxVideo" ref={skyboxVideoRef} crossOrigin="anonymous" playsInline muted loop />
+                <video id="panelVideo" ref={panelVideoRef} crossOrigin="anonymous" playsInline muted loop />
+              </a-assets>
+
+              <a-entity position="0 1.6 0">
+                <a-camera wasd-controls-enabled="false" look-controls="magicWindowTrackingEnabled: true; touchEnabled: true" />
+              </a-entity>
+
+              <a-videosphere src="#skyboxVideo" rotation="0 180 0" segments-height="64" segments-width="128" />
+              <a-circle
+                src="#panelVideo"
+                radius="1.2"
+                position="0 1.6 -2.4"
+                rotation="-5 0 0"
+                material="side: double; transparent: true; opacity: 0.95"
+              />
+
+              <a-entity light="type: ambient; intensity: 0.35" />
+              <a-entity light="type: point; intensity: 0.8; distance: 6" position="0 2 -1" />
+            </a-scene>
           </div>
         )}
       </main>
