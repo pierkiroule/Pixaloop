@@ -1,5 +1,26 @@
-import { Anchor, Camera, Cloud, Droplets, Eye, Globe, Image as ImageIcon, Monitor, Pause, Play, Sparkles, Stars, Trash2, Wind, Zap } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  Anchor,
+  Camera,
+  Cloud,
+  Droplets,
+  Eye,
+  Globe,
+  Image as ImageIcon,
+  LayoutPanelLeft,
+  Menu,
+  Monitor,
+  Palette,
+  Pause,
+  Play,
+  Sparkles,
+  Stars,
+  Trash2,
+  Upload,
+  Wand2,
+  Wind,
+  Zap,
+} from './icons';
 import { registerFloatingParticles } from './aframe/particles';
 import './App.css';
 
@@ -159,6 +180,11 @@ function App() {
   const [imageUrl, setImageUrl] = useState(null);
   const [isAnimating, setIsAnimating] = useState(false);
   const [tool, setTool] = useState('flow');
+  const [isNavOpen, setIsNavOpen] = useState(true);
+  const [activeTab, setActiveTab] = useState('scene');
+  const [watercolorColor, setWatercolorColor] = useState('#6fb0ff');
+  const [watercolorSize, setWatercolorSize] = useState(48);
+  const [watercolorWetness, setWatercolorWetness] = useState(0.75);
   const [filterType, setFilterType] = useState(0);
   const [paths, setPaths] = useState([]);
   const [anchors, setAnchors] = useState([]);
@@ -172,12 +198,15 @@ function App() {
   const canvasRef = useRef(null);
   const masterCanvasRef = useRef(null);
   const flowCanvasRef = useRef(null);
+  const watercolorCanvasRef = useRef(null);
+  const sourceCompositeRef = useRef(null);
   const previewCanvasRef = useRef(null);
   const imgRef = useRef(null);
   const skyboxVideoRef = useRef(null);
   const panelVideoRef = useRef(null);
   const aframeReady = useRef(null);
   const previewFrameRef = useRef(null);
+  const watercolorStrokeRef = useRef(null);
 
   const engine = useRef({
     gl: null,
@@ -188,6 +217,33 @@ function App() {
     duration: 5,
     frameId: null,
   });
+
+  const drawImageToCanvas = useCallback((imageElement, target) => {
+    const canvas = target;
+    const ctx = canvas.getContext('2d');
+    const { width, height } = canvas;
+    ctx.clearRect(0, 0, width, height);
+
+    const imgAspect = imageElement.width / imageElement.height;
+    const canvasAspect = width / height;
+
+    let drawWidth = width;
+    let drawHeight = height;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    if (imgAspect > canvasAspect) {
+      drawWidth = width;
+      drawHeight = width / imgAspect;
+      offsetY = (height - drawHeight) / 2;
+    } else {
+      drawHeight = height;
+      drawWidth = height * imgAspect;
+      offsetX = (width - drawWidth) / 2;
+    }
+
+    ctx.drawImage(imageElement, offsetX, offsetY, drawWidth, drawHeight);
+  }, []);
 
   const setupWebGL = useCallback((imageElement) => {
     const canvas = canvasRef.current;
@@ -237,6 +293,25 @@ function App() {
     engine.current.sourceTex = sourceTexture;
     engine.current.startTime = Date.now();
   }, []);
+
+  const refreshSourceTexture = useCallback(() => {
+    const gl = engine.current.gl;
+    const sourceTex = engine.current.sourceTex;
+    const compositeCanvas = sourceCompositeRef.current;
+    if (!gl || !sourceTex || !imgRef.current || !compositeCanvas) return;
+
+    drawImageToCanvas(imgRef.current, compositeCanvas);
+    const watercolorCanvas = watercolorCanvasRef.current;
+    if (watercolorCanvas) {
+      const ctx = compositeCanvas.getContext('2d');
+      ctx.globalAlpha = 1;
+      ctx.drawImage(watercolorCanvas, 0, 0);
+    }
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, sourceTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, compositeCanvas);
+  }, [drawImageToCanvas]);
 
   const updateFlowMap = useCallback(() => {
     const gl = engine.current.gl;
@@ -309,6 +384,33 @@ function App() {
     engine.current.flowTex = flowTexture;
   }, [anchors, paths]);
 
+  const splatWatercolor = useCallback(
+    (point) => {
+      const canvas = watercolorCanvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const px = point.x * CANVAS_SIZE;
+      const py = point.y * CANVAS_SIZE;
+      const radius = watercolorSize;
+      const fade = Math.max(0.2, Math.min(0.95, watercolorWetness));
+      const gradient = ctx.createRadialGradient(px, py, radius * 0.08, px, py, radius);
+      gradient.addColorStop(0, `${watercolorColor}cc`);
+      gradient.addColorStop(0.4, `${watercolorColor}80`);
+      gradient.addColorStop(1, `${watercolorColor}00`);
+
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.globalAlpha = fade;
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(px, py, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+      refreshSourceTexture();
+    },
+    [refreshSourceTexture, watercolorColor, watercolorSize, watercolorWetness],
+  );
+
   useEffect(() => {
     const renderLoop = () => {
       const { gl, program, sourceTex, flowTex, duration } = engine.current;
@@ -375,6 +477,10 @@ function App() {
     tempImg.onload = () => {
       imgRef.current = tempImg;
       setImageUrl(url);
+      setPaths([]);
+      setAnchors([]);
+      const watercolorCanvas = watercolorCanvasRef.current;
+      watercolorCanvas?.getContext('2d')?.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
     };
     tempImg.src = url;
   };
@@ -383,8 +489,9 @@ function App() {
     if (imageUrl && canvasRef.current && imgRef.current) {
       setupWebGL(imgRef.current);
       updateFlowMap();
+      refreshSourceTexture();
     }
-  }, [imageUrl, setupWebGL, updateFlowMap]);
+  }, [imageUrl, refreshSourceTexture, setupWebGL, updateFlowMap]);
 
   useEffect(() => {
     if (imageUrl) {
@@ -392,8 +499,16 @@ function App() {
     }
   }, [anchors, paths, imageUrl, updateFlowMap]);
 
+  const clearWatercolor = useCallback(() => {
+    const watercolorCanvas = watercolorCanvasRef.current;
+    if (watercolorCanvas) {
+      watercolorCanvas.getContext('2d')?.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+      refreshSourceTexture();
+    }
+  }, [refreshSourceTexture]);
+
   const startRecording = async (type) => {
-    if (isRecording) return;
+    if (isRecording || !imageUrl) return;
 
     setRecordType(type);
     setRecordProgress(0);
@@ -442,6 +557,13 @@ function App() {
       return;
     }
 
+    if (tool === 'watercolor') {
+      setIsDrawing(true);
+      watercolorStrokeRef.current = { x, y };
+      splatWatercolor({ x, y });
+      return;
+    }
+
     event.currentTarget.setPointerCapture(event.pointerId);
     setIsDrawing(true);
     setPaths((prev) => [...prev, [{ x, y }]]);
@@ -452,6 +574,23 @@ function App() {
     const rect = event.currentTarget.getBoundingClientRect();
     const x = (event.clientX - rect.left) / rect.width;
     const y = (event.clientY - rect.top) / rect.height;
+
+    if (tool === 'watercolor') {
+      const last = watercolorStrokeRef.current;
+      const dx = x - (last?.x ?? x);
+      const dy = y - (last?.y ?? y);
+      const dist = Math.hypot(dx, dy);
+      const steps = Math.max(1, Math.floor(dist / 0.01));
+      for (let i = 1; i <= steps; i += 1) {
+        const t = i / steps;
+        splatWatercolor({
+          x: (last?.x ?? x) + dx * t,
+          y: (last?.y ?? y) + dy * t,
+        });
+      }
+      watercolorStrokeRef.current = { x, y };
+      return;
+    }
 
     setPaths((prev) => {
       const updated = [...prev];
@@ -471,6 +610,7 @@ function App() {
     if (event?.currentTarget?.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
+    watercolorStrokeRef.current = null;
     setIsDrawing(false);
   };
 
@@ -572,6 +712,14 @@ function App() {
     };
   }, [imageUrl, preview2DEnabled, renderPreviewLayer]);
 
+  const tabs = [
+    { id: 'scene', label: 'Production', icon: LayoutPanelLeft },
+    { id: 'paint', label: 'Aquarelle', icon: Palette },
+    { id: 'export', label: 'Export', icon: Camera },
+  ];
+
+  const watercolorPalette = ['#6fb0ff', '#f472b6', '#facc15', '#34d399', '#a78bfa', '#f97316'];
+
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -585,6 +733,14 @@ function App() {
           </div>
         </div>
         <div className="header-actions">
+          <button
+            className={`nav-toggle ${isNavOpen ? 'active' : ''}`}
+            type="button"
+            onClick={() => setIsNavOpen((prev) => !prev)}
+            title="Ouvrir le menu"
+          >
+            <Menu size={18} />
+          </button>
           {imageUrl && (
             <button className={`pill-button ${isAnimating ? 'secondary' : 'primary'}`} onClick={() => setIsAnimating((prev) => !prev)} type="button">
               {isAnimating ? <Pause size={18} /> : <Play size={18} />}
@@ -595,155 +751,315 @@ function App() {
       </header>
 
       <main className="stage">
-        <div
-          className="canvas-area"
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={stopDrawing}
-          onPointerCancel={stopDrawing}
-        >
-          {imageUrl ? (
-            <div className="canvas-stack">
-              <canvas ref={canvasRef} width={CANVAS_SIZE} height={CANVAS_SIZE} className="flow-canvas" />
+        <div className="workspace-grid">
+          <div
+            className="canvas-area"
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={stopDrawing}
+            onPointerCancel={stopDrawing}
+          >
+            {imageUrl ? (
+              <div className="canvas-stack">
+                <canvas ref={canvasRef} width={CANVAS_SIZE} height={CANVAS_SIZE} className="flow-canvas" />
 
-              <div className="skybox-monitor">
-                <canvas
-                  ref={(el) => {
-                    if (!el) return;
-                    const draw = () => {
-                      if (masterCanvasRef.current) {
-                        const ctx = el.getContext('2d');
-                        ctx.drawImage(
-                          masterCanvasRef.current,
-                          0,
-                          0,
-                          MASTER_WIDTH,
-                          MASTER_HEIGHT,
-                          0,
-                          0,
-                          el.width,
-                          el.height,
-                        );
-                      }
-                      requestAnimationFrame(draw);
-                    };
-                    draw();
-                  }}
-                  width={240}
-                  height={120}
-                  className="monitor-canvas"
-                />
-                <div className="monitor-label">
-                  <Globe size={12} /> 4K Skybox Master
+                <div className="skybox-monitor">
+                  <canvas
+                    ref={(el) => {
+                      if (!el) return;
+                      const draw = () => {
+                        if (masterCanvasRef.current) {
+                          const ctx = el.getContext('2d');
+                          ctx.drawImage(
+                            masterCanvasRef.current,
+                            0,
+                            0,
+                            MASTER_WIDTH,
+                            MASTER_HEIGHT,
+                            0,
+                            0,
+                            el.width,
+                            el.height,
+                          );
+                        }
+                        requestAnimationFrame(draw);
+                      };
+                      draw();
+                    }}
+                    width={240}
+                    height={120}
+                    className="monitor-canvas"
+                  />
+                  <div className="monitor-label">
+                    <Globe size={12} /> 4K Skybox Master
+                  </div>
                 </div>
-              </div>
 
-              {!isAnimating && (
-                <svg className="flow-overlay" viewBox="0 0 1000 1000" preserveAspectRatio="none">
-                  {anchors.map((anchor, index) => (
-                    <circle
-                      key={`anchor-${index}`}
-                      cx={anchor.x * 1000}
-                      cy={anchor.y * 1000}
-                      r="15"
-                      fill="#ef4444"
-                      stroke="white"
-                      strokeWidth="4"
-                    />
-                  ))}
-                  {paths.map((path, index) => (
-                    <polyline
-                      // eslint-disable-next-line react/no-array-index-key
-                      key={`path-${index}`}
-                      points={path.map((p) => `${p.x * 1000},${p.y * 1000}`).join(' ')}
-                      fill="none"
-                      stroke="#6366f1"
-                      strokeWidth="30"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      opacity="0.4"
-                    />
-                  ))}
-                </svg>
-              )}
-              {preview2DEnabled && (
-                <canvas ref={previewCanvasRef} width={PREVIEW_SIZE} height={PREVIEW_SIZE} className="preview-layer" />
-              )}
-            </div>
-          ) : (
-            <label className="upload-drop">
-              <Monitor size={72} />
-              <div>
-                <p className="eyebrow">Importer Image</p>
-                <p className="muted">Démarrer une production 360° VR</p>
+                {!isAnimating && (
+                  <svg className="flow-overlay" viewBox="0 0 1000 1000" preserveAspectRatio="none">
+                    {anchors.map((anchor, index) => (
+                      <circle
+                        key={`anchor-${index}`}
+                        cx={anchor.x * 1000}
+                        cy={anchor.y * 1000}
+                        r="15"
+                        fill="#ef4444"
+                        stroke="white"
+                        strokeWidth="4"
+                      />
+                    ))}
+                    {paths.map((path, index) => (
+                      <polyline
+                        // eslint-disable-next-line react/no-array-index-key
+                        key={`path-${index}`}
+                        points={path.map((p) => `${p.x * 1000},${p.y * 1000}`).join(' ')}
+                        fill="none"
+                        stroke="#6366f1"
+                        strokeWidth="30"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        opacity="0.4"
+                      />
+                    ))}
+                  </svg>
+                )}
+                {preview2DEnabled && (
+                  <canvas ref={previewCanvasRef} width={PREVIEW_SIZE} height={PREVIEW_SIZE} className="preview-layer" />
+                )}
               </div>
-              <input type="file" accept="image/*" onChange={handleUpload} />
-            </label>
-          )}
-        </div>
-
-        {imageUrl && (
-          <div className="controls-shell">
-            {!isAnimating && (
-              <div className="toolbar">
-                <div className="toolbar-group">
-                  <button className={`tool ${tool === 'flow' ? 'active' : ''}`} type="button" onClick={() => setTool('flow')}>
-                    <Wind size={20} /> Flux
-                  </button>
-                  <button className={`tool ${tool === 'anchor' ? 'active' : ''}`} type="button" onClick={() => setTool('anchor')}>
-                    <Anchor size={20} /> Ancre
-                  </button>
+            ) : (
+              <label className="upload-drop">
+                <Monitor size={72} />
+                <div>
+                  <p className="eyebrow">Importer Image</p>
+                  <p className="muted">Démarrer une production 360° VR</p>
                 </div>
-                <div className="toolbar-divider" />
-                <div className="toolbar-actions">
-                  <button className="icon" type="button" title="Export 2D Loop" onClick={() => startRecording('2D')}>
-                    <Camera size={22} />
-                  </button>
-                  <button className="icon" type="button" title="Record 360 Skybox Loop" onClick={() => startRecording('360')}>
-                    <Globe size={22} />
-                  </button>
-                  <button
-                    className={`icon ${vrEnabled ? 'active' : ''}`}
-                    type="button"
-                    title="Basculer bulle VR A-Frame"
-                    onClick={() => setVrEnabled((prev) => !prev)}
-                  >
-                    <Sparkles size={20} />
-                  </button>
-                  <button
-                    className={`icon ${preview2DEnabled ? 'active' : ''}`}
-                    type="button"
-                    title="Afficher un preview 2D léger"
-                    onClick={() => setPreview2DEnabled((prev) => !prev)}
-                  >
-                    <Eye size={20} />
-                  </button>
-                  <button className="icon" type="button" title="Reset Canvas" onClick={() => { setPaths([]); setAnchors([]); }}>
-                    <Trash2 size={22} />
-                  </button>
-                </div>
-              </div>
+                <input type="file" accept="image/*" onChange={handleUpload} />
+              </label>
             )}
+          </div>
 
-            <div className="filter-rail">
-              {FILTERS.map((filter) => {
-                const Icon = ICONS[filter.icon] || ImageIcon;
+          <aside className={`control-panel ${isNavOpen ? 'open' : ''}`}>
+            <div className="panel-tabs">
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
                 return (
                   <button
-                    key={filter.id}
+                    key={tab.id}
+                    className={`panel-tab ${activeTab === tab.id ? 'active' : ''}`}
                     type="button"
-                    className={`filter ${filterType === filter.id ? 'active' : ''}`}
-                    onClick={() => setFilterType(filter.id)}
-                    title={filter.label}
+                    onClick={() => setActiveTab(tab.id)}
                   >
-                    <Icon size={18} />
-                    <span className="filter-label">{filter.label}</span>
+                    <Icon size={16} />
+                    <span>{tab.label}</span>
                   </button>
                 );
               })}
             </div>
-          </div>
-        )}
+
+            <div className="panel-scroll">
+              <section className="panel-card">
+                <div className="card-header">
+                  <div>
+                    <p className="chip">Média</p>
+                    <h3>Import & Setup</h3>
+                  </div>
+                  <Wand2 size={18} className="muted-icon" />
+                </div>
+                <p className="muted">Importez ou remplacez une image source, puis configurez vos flux.</p>
+                <div className="inline-actions">
+                  <label className="inline-upload">
+                    <Upload size={16} />
+                    <span>{imageUrl ? 'Remplacer l’image' : 'Importer une image'}</span>
+                    <input type="file" accept="image/*" onChange={handleUpload} />
+                  </label>
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    onClick={() => {
+                      setPaths([]);
+                      setAnchors([]);
+                      clearWatercolor();
+                    }}
+                  >
+                    <Trash2 size={16} />
+                    Réinitialiser la scène
+                  </button>
+                </div>
+                <div className="inline-actions subtle">
+                  <button
+                    className={`pill ${tool === 'flow' ? 'active' : ''}`}
+                    type="button"
+                    onClick={() => {
+                      setTool('flow');
+                      setActiveTab('scene');
+                    }}
+                  >
+                    <Wind size={16} /> Dessin Flux
+                  </button>
+                  <button
+                    className={`pill ${tool === 'anchor' ? 'active' : ''}`}
+                    type="button"
+                    onClick={() => {
+                      setTool('anchor');
+                      setActiveTab('scene');
+                    }}
+                  >
+                    <Anchor size={16} /> Ancrages
+                  </button>
+                  <button
+                    className={`pill ${tool === 'watercolor' ? 'active' : ''}`}
+                    type="button"
+                    onClick={() => {
+                      setTool('watercolor');
+                      setActiveTab('paint');
+                    }}
+                  >
+                    <Droplets size={16} /> Aquarelle
+                  </button>
+                </div>
+              </section>
+
+              {imageUrl && activeTab === 'scene' && (
+                <section className="panel-card">
+                  <div className="card-header">
+                    <div>
+                      <p className="chip">Direction</p>
+                      <h3>Flux & Filtres</h3>
+                    </div>
+                    <LayoutPanelLeft size={18} className="muted-icon" />
+                  </div>
+                  <p className="muted">Dessinez les flux de mouvement ou ajoutez des ancres, puis sélectionnez un style visuel.</p>
+                  <div className="filter-rail">
+                    {FILTERS.map((filter) => {
+                      const Icon = ICONS[filter.icon] || ImageIcon;
+                      return (
+                        <button
+                          key={filter.id}
+                          type="button"
+                          className={`filter ${filterType === filter.id ? 'active' : ''}`}
+                          onClick={() => setFilterType(filter.id)}
+                          title={filter.label}
+                        >
+                          <Icon size={18} />
+                          <span className="filter-label">{filter.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
+
+              {imageUrl && activeTab === 'paint' && (
+                <section className="panel-card">
+                  <div className="card-header">
+                    <div>
+                      <p className="chip">Peinture</p>
+                      <h3>Pinceau Aquarelle</h3>
+                    </div>
+                    <Palette size={18} className="muted-icon" />
+                  </div>
+                  <p className="muted">
+                    Ajoutez des touches aquarelle directement sur la scène. Ces lavis seront animés et présents dans vos exports vidéo.
+                  </p>
+                  <div className="inline-actions">
+                    <button
+                      type="button"
+                      className={`primary-control ${tool === 'watercolor' ? 'active' : ''}`}
+                      onClick={() => setTool('watercolor')}
+                    >
+                      <Droplets size={16} /> Activer le pinceau
+                    </button>
+                    <button type="button" className="ghost-button" onClick={clearWatercolor}>
+                      <Trash2 size={16} /> Nettoyer la couche
+                    </button>
+                  </div>
+                  <div className="color-palette">
+                    {watercolorPalette.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        className={`color-chip ${watercolorColor === color ? 'active' : ''}`}
+                        style={{ backgroundColor: color }}
+                        onClick={() => setWatercolorColor(color)}
+                        aria-label={`Couleur ${color}`}
+                      />
+                    ))}
+                  </div>
+                  <div className="slider-field">
+                    <label htmlFor="brush-size">
+                      Taille du pinceau
+                      <span>{Math.round(watercolorSize)} px</span>
+                    </label>
+                    <input
+                      id="brush-size"
+                      type="range"
+                      min="20"
+                      max="120"
+                      step="2"
+                      value={watercolorSize}
+                      onChange={(e) => setWatercolorSize(Number(e.target.value))}
+                    />
+                  </div>
+                  <div className="slider-field">
+                    <label htmlFor="brush-wet">
+                      Humidité
+                      <span>{Math.round(watercolorWetness * 100)}%</span>
+                    </label>
+                    <input
+                      id="brush-wet"
+                      type="range"
+                      min="0.25"
+                      max="1"
+                      step="0.05"
+                      value={watercolorWetness}
+                      onChange={(e) => setWatercolorWetness(Number(e.target.value))}
+                    />
+                  </div>
+                </section>
+              )}
+
+              {imageUrl && activeTab === 'export' && (
+                <section className="panel-card">
+                  <div className="card-header">
+                    <div>
+                      <p className="chip">Export</p>
+                      <h3>Rendus & VR</h3>
+                    </div>
+                    <Camera size={18} className="muted-icon" />
+                  </div>
+                  <p className="muted">Capturez vos aquarelles animées en boucle 2D ou 360°, ou ouvrez la bulle VR.</p>
+                  <div className="inline-actions">
+                    <button className="primary-control" type="button" onClick={() => startRecording('2D')}>
+                      <Camera size={16} /> Export 2D
+                    </button>
+                    <button className="primary-control" type="button" onClick={() => startRecording('360')}>
+                      <Globe size={16} /> Export 360°
+                    </button>
+                  </div>
+                  <div className="inline-actions subtle">
+                    <button
+                      className={`pill ${vrEnabled ? 'active' : ''}`}
+                      type="button"
+                      onClick={() => setVrEnabled((prev) => !prev)}
+                    >
+                      <Sparkles size={16} /> VR Bubble
+                    </button>
+                    <button
+                      className={`pill ${preview2DEnabled ? 'active' : ''}`}
+                      type="button"
+                      onClick={() => setPreview2DEnabled((prev) => !prev)}
+                    >
+                      <Eye size={16} /> Aperçu 2D
+                    </button>
+                  </div>
+                </section>
+              )}
+            </div>
+          </aside>
+
+          {isNavOpen && <button className="panel-overlay" type="button" onClick={() => setIsNavOpen(false)} aria-label="Fermer le menu" />}
+        </div>
 
         {isRecording && (
           <div className="record-overlay">
@@ -816,6 +1132,8 @@ function App() {
 
       <canvas ref={flowCanvasRef} width={CANVAS_SIZE} height={CANVAS_SIZE} className="hidden-canvas" />
       <canvas ref={masterCanvasRef} width={MASTER_WIDTH} height={MASTER_HEIGHT} className="hidden-canvas" />
+      <canvas ref={watercolorCanvasRef} width={CANVAS_SIZE} height={CANVAS_SIZE} className="hidden-canvas" />
+      <canvas ref={sourceCompositeRef} width={CANVAS_SIZE} height={CANVAS_SIZE} className="hidden-canvas" />
     </div>
   );
 }
