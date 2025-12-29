@@ -23,6 +23,7 @@ import {
 } from './icons';
 import { registerFloatingParticles } from './aframe/particles';
 import './App.css';
+import DrawingLooper from './DrawingLooper';
 
 const CANVAS_SIZE = 1024;
 const PREVIEW_SIZE = 512;
@@ -194,6 +195,8 @@ function App() {
   const [recordType, setRecordType] = useState('2D');
   const [vrEnabled, setVrEnabled] = useState(false);
   const [preview2DEnabled, setPreview2DEnabled] = useState(false);
+  const [looperVideoUrl, setLooperVideoUrl] = useState(null);
+  const [useLooperForSkybox, setUseLooperForSkybox] = useState(false);
 
   const canvasRef = useRef(null);
   const masterCanvasRef = useRef(null);
@@ -207,6 +210,7 @@ function App() {
   const aframeReady = useRef(null);
   const previewFrameRef = useRef(null);
   const watercolorStrokeRef = useRef(null);
+  const looperUrlRef = useRef(null);
 
   const engine = useRef({
     gl: null,
@@ -666,13 +670,27 @@ function App() {
     }
     ensureAFrameLoaded()
       .then(() => {
-        startVideoStream(masterCanvasRef.current, skyboxVideoRef.current);
-        startVideoStream(canvasRef.current, panelVideoRef.current);
+        if (useLooperForSkybox && looperVideoUrl) {
+          const applyVideo = (videoEl) => {
+            if (!videoEl) return;
+            stopVideoStream(videoEl);
+            videoEl.src = looperVideoUrl;
+            videoEl.loop = true;
+            videoEl.muted = true;
+            videoEl.playsInline = true;
+            videoEl.play().catch(() => {});
+          };
+          applyVideo(skyboxVideoRef.current);
+          applyVideo(panelVideoRef.current);
+        } else {
+          startVideoStream(masterCanvasRef.current, skyboxVideoRef.current);
+          startVideoStream(canvasRef.current, panelVideoRef.current);
+        }
       })
       .catch(() => {
         setVrEnabled(false);
       });
-  }, [vrEnabled, ensureAFrameLoaded, startVideoStream, stopVideoStream]);
+  }, [vrEnabled, ensureAFrameLoaded, startVideoStream, stopVideoStream, looperVideoUrl, useLooperForSkybox]);
 
   const renderPreviewLayer = useCallback(() => {
     const previewCanvas = previewCanvasRef.current;
@@ -711,6 +729,19 @@ function App() {
       }
     };
   }, [imageUrl, preview2DEnabled, renderPreviewLayer]);
+
+  const handleLooperReady = useCallback((url) => {
+    if (looperUrlRef.current) {
+      URL.revokeObjectURL(looperUrlRef.current);
+    }
+    looperUrlRef.current = url;
+    setLooperVideoUrl(url);
+    setUseLooperForSkybox(false);
+  }, []);
+
+  useEffect(() => () => {
+    if (looperUrlRef.current) URL.revokeObjectURL(looperUrlRef.current);
+  }, []);
 
   const tabs = [
     { id: 'scene', label: 'Production', icon: LayoutPanelLeft },
@@ -1052,7 +1083,36 @@ function App() {
                     >
                       <Eye size={16} /> Aperçu 2D
                     </button>
+                    <button
+                      className={`pill ${useLooperForSkybox ? 'active' : ''}`}
+                      type="button"
+                      disabled={!looperVideoUrl}
+                      onClick={() => {
+                        if (!looperVideoUrl) return;
+                        setUseLooperForSkybox((prev) => !prev);
+                        setVrEnabled(true);
+                      }}
+                    >
+                      <Sparkles size={16} /> Skybox Looper
+                    </button>
                   </div>
+                </section>
+              )}
+
+              {activeTab === 'export' && (
+                <section className="panel-card looper-card">
+                  <div className="card-header">
+                    <div>
+                      <p className="chip">Nouveau</p>
+                      <h3>Drawing Looper</h3>
+                    </div>
+                    <Sparkles size={18} className="muted-icon" />
+                  </div>
+                  <p className="muted">
+                    Créez une boucle ping-pong 5s pour servir de texture skybox ou panneau VR. L’export 10s se télécharge et peut être routé vers la bulle VR.
+                  </p>
+                  <DrawingLooper onLoopReady={handleLooperReady} />
+                  {!looperVideoUrl && <p className="muted subtle-text">Générez une boucle pour activer le routage VR.</p>}
                 </section>
               )}
             </div>

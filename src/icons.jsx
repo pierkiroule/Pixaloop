@@ -1,3 +1,5 @@
+import PropTypes from './propTypesStub';
+
 const createIcon = (paths) => {
   const Icon = ({ size = 24, ...rest }) => (
     <svg
@@ -16,6 +18,9 @@ const createIcon = (paths) => {
       ))}
     </svg>
   );
+  Icon.propTypes = {
+    size: PropTypes.number,
+  };
   return Icon;
 };
 
