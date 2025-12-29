@@ -1,5 +1,6 @@
 import { Anchor, Camera, Cloud, Droplets, Globe, Image as ImageIcon, Monitor, Pause, Play, Sparkles, Stars, Trash2, Wind, Zap } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { registerFloatingParticles } from './aframe/particles';
 import './App.css';
 
 const CANVAS_SIZE = 1024;
@@ -473,13 +474,17 @@ function App() {
     if (aframeReady.current) return aframeReady.current;
     aframeReady.current = new Promise((resolve, reject) => {
       if (window.AFRAME) {
+        registerFloatingParticles();
         resolve();
         return;
       }
       const script = document.createElement('script');
       script.src = 'https://aframe.io/releases/1.5.0/aframe.min.js';
       script.async = true;
-      script.onload = () => resolve();
+      script.onload = () => {
+        registerFloatingParticles();
+        resolve();
+      };
       script.onerror = reject;
       document.head.appendChild(script);
     });
@@ -750,6 +755,7 @@ function App() {
 
               <a-entity light="type: ambient; intensity: 0.35" />
               <a-entity light="type: point; intensity: 0.8; distance: 6" position="0 2 -1" />
+              <a-entity floating-particles="density: 200; speed: 0.4; size: 0.03; color: #a8e6ff; vrOnly: true" />
             </a-scene>
           </div>
         )}
