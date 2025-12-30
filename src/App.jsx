@@ -1083,7 +1083,7 @@ function App() {
                 <Sparkles size={18} className="muted-icon" />
               </div>
               <p className="muted">
-                Créez une boucle ping-pong 5s pour servir de texture skybox ou panneau VR. L’export 10s se télécharge et peut être routé vers la bulle VR.
+                Créez une boucle ping-pong 15s pour servir de texture skybox ou panneau VR. L’export 30s se télécharge et peut être routé vers la bulle VR.
               </p>
               <DrawingLooper onLoopReady={handleLooperReady} />
               {!looperVideoUrl && <p className="muted subtle-text">Générez une boucle pour activer le routage VR.</p>}

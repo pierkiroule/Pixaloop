@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import PropTypes from './propTypesStub';
 
-const LOOP_DURATION = 5000;
+const LOOP_DURATION = 15000;
 const paletteColors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#0f172a', '#ffffff'];
 const toolsConfig = {
   watercolor: { softness: 0.85, jitter: 0.6 },
@@ -191,7 +191,7 @@ function DrawingLooper({ onLoopReady }) {
     };
 
     recorder.start();
-    setStatus('Enregistrement 10s ping-pong');
+    setStatus('Enregistrement 30s ping-pong');
     exportModeRef.current = 'recording';
     cycleStartRef.current = Date.now();
   };
@@ -279,7 +279,7 @@ function DrawingLooper({ onLoopReady }) {
           </div>
           <div>
             <p className="chip">Drawing Looper</p>
-            <h4 className="looper-title">Ping-Pong 5s</h4>
+            <h4 className="looper-title">Ping-Pong 15s</h4>
             <p className="looper-sub">{loopDirection} • {status}</p>
           </div>
         </div>
@@ -367,7 +367,7 @@ function DrawingLooper({ onLoopReady }) {
           <video src={lastExportUrl} controls loop muted playsInline />
           <div>
             <p className="chip">Dernier export</p>
-            <p className="muted">Boucle 10s prête pour la skybox ou le panneau VR.</p>
+            <p className="muted">Boucle 30s prête pour la skybox ou le panneau VR.</p>
             <a className="pill download-pill" href={lastExportUrl} download>
               Télécharger .webm
             </a>
