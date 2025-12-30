@@ -935,78 +935,94 @@ function App() {
         );
       case 'paint':
         return (
-          <section className="panel-card">
-            <div className="card-header">
-              <div>
-                <p className="chip">Peinture</p>
-                <h3>Pinceau Aquarelle</h3>
+          <>
+            <section className="panel-card">
+              <div className="card-header">
+                <div>
+                  <p className="chip">Peinture</p>
+                  <h3>Pinceau Aquarelle</h3>
+                </div>
+                <Palette size={18} className="muted-icon" />
               </div>
-              <Palette size={18} className="muted-icon" />
-            </div>
-            <p className="muted">
-              Ajoutez des touches aquarelle directement sur la scène. Ces lavis seront animés et présents dans vos exports vidéo.
-            </p>
-            {imageUrl ? (
-              <>
-                <div className="inline-actions">
-                  <button
-                    type="button"
-                    className={`primary-control ${tool === 'watercolor' ? 'active' : ''}`}
-                    onClick={() => setTool('watercolor')}
-                  >
-                    <Droplets size={16} /> Activer le pinceau
-                  </button>
-                  <button type="button" className="ghost-button" onClick={clearWatercolor}>
-                    <Trash2 size={16} /> Nettoyer la couche
-                  </button>
-                </div>
-                <div className="color-palette">
-                  {watercolorPalette.map((color) => (
+              <p className="muted">
+                Ajoutez des touches aquarelle directement sur la scène. Ces lavis seront animés et présents dans vos exports vidéo.
+              </p>
+              {imageUrl ? (
+                <>
+                  <div className="inline-actions">
                     <button
-                      key={color}
                       type="button"
-                      className={`color-chip ${watercolorColor === color ? 'active' : ''}`}
-                      style={{ backgroundColor: color }}
-                      onClick={() => setWatercolorColor(color)}
-                      aria-label={`Couleur ${color}`}
+                      className={`primary-control ${tool === 'watercolor' ? 'active' : ''}`}
+                      onClick={() => setTool('watercolor')}
+                    >
+                      <Droplets size={16} /> Activer le pinceau
+                    </button>
+                    <button type="button" className="ghost-button" onClick={clearWatercolor}>
+                      <Trash2 size={16} /> Nettoyer la couche
+                    </button>
+                  </div>
+                  <div className="color-palette">
+                    {watercolorPalette.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        className={`color-chip ${watercolorColor === color ? 'active' : ''}`}
+                        style={{ backgroundColor: color }}
+                        onClick={() => setWatercolorColor(color)}
+                        aria-label={`Couleur ${color}`}
+                      />
+                    ))}
+                  </div>
+                  <div className="slider-field">
+                    <label htmlFor="brush-size">
+                      Taille du pinceau
+                      <span>{Math.round(watercolorSize)} px</span>
+                    </label>
+                    <input
+                      id="brush-size"
+                      type="range"
+                      min="20"
+                      max="120"
+                      step="2"
+                      value={watercolorSize}
+                      onChange={(e) => setWatercolorSize(Number(e.target.value))}
                     />
-                  ))}
+                  </div>
+                  <div className="slider-field">
+                    <label htmlFor="brush-wet">
+                      Humidité
+                      <span>{Math.round(watercolorWetness * 100)}%</span>
+                    </label>
+                    <input
+                      id="brush-wet"
+                      type="range"
+                      min="0.25"
+                      max="1"
+                      step="0.05"
+                      value={watercolorWetness}
+                      onChange={(e) => setWatercolorWetness(Number(e.target.value))}
+                    />
+                  </div>
+                </>
+              ) : (
+                <p className="muted subtle-text">Importez une image pour activer le pinceau aquarelle.</p>
+              )}
+            </section>
+            <section className="panel-card looper-card">
+              <div className="card-header">
+                <div>
+                  <p className="chip">Looper</p>
+                  <h3>Canvas 15s en boucle</h3>
                 </div>
-                <div className="slider-field">
-                  <label htmlFor="brush-size">
-                    Taille du pinceau
-                    <span>{Math.round(watercolorSize)} px</span>
-                  </label>
-                  <input
-                    id="brush-size"
-                    type="range"
-                    min="20"
-                    max="120"
-                    step="2"
-                    value={watercolorSize}
-                    onChange={(e) => setWatercolorSize(Number(e.target.value))}
-                  />
-                </div>
-                <div className="slider-field">
-                  <label htmlFor="brush-wet">
-                    Humidité
-                    <span>{Math.round(watercolorWetness * 100)}%</span>
-                  </label>
-                  <input
-                    id="brush-wet"
-                    type="range"
-                    min="0.25"
-                    max="1"
-                    step="0.05"
-                    value={watercolorWetness}
-                    onChange={(e) => setWatercolorWetness(Number(e.target.value))}
-                  />
-                </div>
-              </>
-            ) : (
-              <p className="muted subtle-text">Importez une image pour activer le pinceau aquarelle.</p>
-            )}
-          </section>
+                <Sparkles size={18} className="muted-icon" />
+              </div>
+              <p className="muted">
+                Dessinez/redessinez sur le canvas dédié et prévisualisez la boucle 15s (export 30s). Parfait pour nourrir la skybox 360 ou un panneau VR.
+              </p>
+              <DrawingLooper onLoopReady={handleLooperReady} />
+              {!looperVideoUrl && <p className="muted subtle-text">Générez une boucle pour l’activer dans l’onglet Export.</p>}
+            </section>
+          </>
         );
       case 'export':
         return (
@@ -1073,20 +1089,9 @@ function App() {
                   <Sparkles size={16} /> Skybox Looper
                 </button>
               </div>
-            </section>
-            <section className="panel-card looper-card">
-              <div className="card-header">
-                <div>
-                  <p className="chip">Nouveau</p>
-                  <h3>Drawing Looper</h3>
-                </div>
-                <Sparkles size={18} className="muted-icon" />
-              </div>
-              <p className="muted">
-                Créez une boucle ping-pong 15s pour servir de texture skybox ou panneau VR. L’export 30s se télécharge et peut être routé vers la bulle VR.
+              <p className="muted subtle-text">
+                Créez votre boucle dans l’onglet Peinture, puis activez-la ici pour la skybox ou un panneau 2D/360°.
               </p>
-              <DrawingLooper onLoopReady={handleLooperReady} />
-              {!looperVideoUrl && <p className="muted subtle-text">Générez une boucle pour activer le routage VR.</p>}
             </section>
           </>
         );
