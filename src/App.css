@@ -545,14 +545,6 @@ body {
   box-shadow: 0 12px 30px rgba(99, 102, 241, 0.35);
 }
 
-.panel-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  border: none;
-  z-index: 11;
-}
-
 .color-palette {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(44px, 1fr));
