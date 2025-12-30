@@ -24,8 +24,8 @@ import {
 import { registerFloatingParticles } from './aframe/particles';
 import './App.css';
 import DrawingLooper from './DrawingLooper';
-import PropTypes from './propTypesStub';
 import BottomBar from './components/BottomBar';
+import QuickFab from './components/QuickFab';
 
 const CANVAS_SIZE = 1024;
 const PREVIEW_SIZE = 512;
@@ -179,47 +179,6 @@ const fragmentShader = `
   }
 `;
 
-const RadialMenu = ({ open, onSelect, activeTool, isAnimating, activeTab }) => {
-  const items = [
-    { id: 'import', label: 'Import', icon: Upload },
-    { id: 'paint', label: 'Peindre', icon: Droplets },
-    { id: 'animate', label: isAnimating ? 'Stop' : 'Animer', icon: isAnimating ? Pause : Play, active: isAnimating },
-    { id: 'export', label: 'Exporter', icon: Camera },
-  ];
-
-  return (
-    <div className={`radial-menu ${open ? 'open' : ''}`}>
-      {items.map((item, index) => {
-        const Icon = item.icon;
-        const isActive =
-          item.active ||
-          (item.id === 'paint' && activeTool === 'watercolor') ||
-          (item.id === 'export' && activeTab === 'export');
-        return (
-          <button
-            key={item.id}
-            type="button"
-            className={`radial-item ${isActive ? 'active' : ''}`}
-            style={{ '--slice': index }}
-            onClick={() => onSelect(item.id)}
-            aria-label={item.label}
-          >
-            <Icon size={18} />
-          </button>
-        );
-      })}
-    </div>
-  );
-};
-
-RadialMenu.propTypes = {
-  open: PropTypes.bool,
-  onSelect: PropTypes.func,
-  activeTool: PropTypes.string,
-  isAnimating: PropTypes.bool,
-  activeTab: PropTypes.string,
-};
-
 const clampToVortex = (point) => {
   const dx = point.x - 0.5;
   const dy = point.y - 0.5;
@@ -273,7 +232,6 @@ function App() {
   const [isAnimating, setIsAnimating] = useState(false);
   const [tool, setTool] = useState('flow');
   const [isNavOpen, setIsNavOpen] = useState(true);
-  const [isRadialOpen, setIsRadialOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('scene');
   const [watercolorColor, setWatercolorColor] = useState('#6fb0ff');
   const [watercolorSize, setWatercolorSize] = useState(48);
@@ -975,49 +933,6 @@ function App() {
                 </label>
               )}
             </div>
-            <div className="vortex-dial">
-              <p className="vortex-label">Vortex UI</p>
-              <button type="button" className="dial-core" onClick={() => setIsRadialOpen((prev) => !prev)} aria-label="Ouvrir le menu radial">
-                <Menu size={20} />
-              </button>
-            </div>
-            <RadialMenu
-              open={isRadialOpen}
-              activeTool={tool === 'watercolor' ? 'watercolor' : tool}
-              isAnimating={isAnimating}
-              activeTab={activeTab}
-              onSelect={(id) => {
-                if (id === 'export') {
-                  setActiveTab('export');
-                  setIsRadialOpen(false);
-                  return;
-                }
-                if (id === 'import') {
-                  fileInputRef.current?.click();
-                  setIsRadialOpen(false);
-                  return;
-                }
-                if (id === 'paint') {
-                  setTool('watercolor');
-                  setActiveTab('paint');
-                  setIsRadialOpen(false);
-                  return;
-                }
-                if (id === 'animate') {
-                  setIsAnimating((prev) => !prev);
-                  setIsRadialOpen(false);
-                  return;
-                }
-                if (id === 'anchor') {
-                  setTool('anchor');
-                  setActiveTab('scene');
-                } else {
-                  setTool('flow');
-                  setActiveTab('scene');
-                }
-                setIsRadialOpen(false);
-              }}
-            />
           </div>
 
           <aside className={`control-panel ${isNavOpen ? 'open' : ''}`}>
@@ -1270,6 +1185,22 @@ function App() {
 
           {isNavOpen && <button className="panel-overlay" type="button" onClick={() => setIsNavOpen(false)} aria-label="Fermer le menu" />}
         </div>
+
+        <QuickFab
+          hasImage={!!imageUrl}
+          isPaintActive={activeTab === 'paint' || tool === 'watercolor'}
+          isExportActive={activeTab === 'export'}
+          onImport={() => fileInputRef.current?.click()}
+          onPaint={() => {
+            setTool('watercolor');
+            setActiveTab('paint');
+            setIsNavOpen(true);
+          }}
+          onExport={() => {
+            setActiveTab('export');
+            setIsNavOpen(true);
+          }}
+        />
 
         {isRecording && (
           <div className="record-overlay">
