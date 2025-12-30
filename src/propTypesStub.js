@@ -7,6 +7,8 @@ const createValidator = () => {
 const PropTypes = {
   func: createValidator(),
   number: createValidator(),
+  bool: createValidator(),
+  string: createValidator(),
 };
 
 export default PropTypes;
