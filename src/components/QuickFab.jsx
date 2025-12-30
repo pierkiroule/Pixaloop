@@ -42,6 +42,8 @@ function QuickFab({ onImport, onPaint, onExport, isPaintActive, isExportActive, 
               className={`fab-action ${action.active ? 'active' : ''}`}
               onClick={() => handleAction(action)}
               disabled={action.disabled}
+              aria-label={action.label}
+              aria-pressed={action.active}
             >
               <Icon size={16} />
               <span>{action.label}</span>
@@ -52,7 +54,7 @@ function QuickFab({ onImport, onPaint, onExport, isPaintActive, isExportActive, 
       <button
         type="button"
         className="fab-button"
-        aria-label="Ouvrir le menu rapide"
+        aria-label={open ? 'Fermer le menu rapide' : 'Ouvrir le menu rapide'}
         aria-expanded={open}
         onClick={() => setOpen((prev) => !prev)}
       >

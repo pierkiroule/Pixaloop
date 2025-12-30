@@ -1006,6 +1006,8 @@ function App() {
                   type="button"
                   onClick={() => setIsAnimating((prev) => !prev)}
                   disabled={!imageUrl}
+                  aria-pressed={isAnimating}
+                  aria-label={isAnimating ? 'Arrêter l’animation' : 'Lancer l’animation'}
                 >
                   {isAnimating ? <Pause size={16} /> : <Play size={16} />}
                   {isAnimating ? 'Stop' : 'Animer'}
@@ -1018,13 +1020,21 @@ function App() {
                 </button>
               </div>
               <div className="inline-actions subtle">
-                <button className={`pill ${vrEnabled ? 'active' : ''}`} type="button" onClick={() => setVrEnabled((prev) => !prev)}>
+                <button
+                  className={`pill ${vrEnabled ? 'active' : ''}`}
+                  type="button"
+                  onClick={() => setVrEnabled((prev) => !prev)}
+                  aria-pressed={vrEnabled}
+                  aria-label={vrEnabled ? 'Désactiver la bulle VR' : 'Activer la bulle VR'}
+                >
                   <Sparkles size={16} /> VR Bubble
                 </button>
                 <button
                   className={`pill ${preview2DEnabled ? 'active' : ''}`}
                   type="button"
                   onClick={() => setPreview2DEnabled((prev) => !prev)}
+                  aria-pressed={preview2DEnabled}
+                  aria-label={preview2DEnabled ? 'Désactiver l’aperçu 2D' : 'Activer l’aperçu 2D'}
                 >
                   <Eye size={16} /> Aperçu 2D
                 </button>
@@ -1037,6 +1047,8 @@ function App() {
                     setUseLooperForSkybox((prev) => !prev);
                     setVrEnabled(true);
                   }}
+                  aria-pressed={useLooperForSkybox}
+                  aria-label={useLooperForSkybox ? 'Désactiver le skybox Looper' : 'Activer le skybox Looper'}
                 >
                   <Sparkles size={16} /> Skybox Looper
                 </button>
@@ -1085,11 +1097,19 @@ function App() {
             type="button"
             onClick={() => setIsNavOpen((prev) => !prev)}
             title="Ouvrir le menu"
+            aria-label={isNavOpen ? 'Fermer le panneau' : 'Ouvrir le panneau'}
+            aria-pressed={isNavOpen}
           >
             <Menu size={18} />
           </button>
           {imageUrl && (
-            <button className={`pill-button ${isAnimating ? 'secondary' : 'primary'}`} onClick={() => setIsAnimating((prev) => !prev)} type="button">
+            <button
+              className={`pill-button ${isAnimating ? 'secondary' : 'primary'}`}
+              onClick={() => setIsAnimating((prev) => !prev)}
+              type="button"
+              aria-pressed={isAnimating}
+              aria-label={isAnimating ? 'Arrêter l’animation' : 'Lancer l’animation'}
+            >
               {isAnimating ? <Pause size={18} /> : <Play size={18} />}
               {isAnimating ? 'Stop' : 'Animer'}
             </button>
