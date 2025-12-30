@@ -26,6 +26,7 @@ import DrawingLooper from './DrawingLooper';
 import BottomBar from './components/BottomBar';
 import BottomSheet from './components/BottomSheet';
 import QuickFab from './components/QuickFab';
+import StatusStrip from './components/StatusStrip';
 
 const CANVAS_SIZE = 1024;
 const PREVIEW_SIZE = 512;
@@ -1063,6 +1064,7 @@ function App() {
   };
 
   const activeSheet = tabs.find((tab) => tab.id === activeTab);
+  const activeFilterLabel = FILTERS.find((filter) => filter.id === filterType)?.label || 'Original';
 
   return (
     <div className="app-shell">
@@ -1103,6 +1105,7 @@ function App() {
             setIsNavOpen(true);
           }}
         />
+        <StatusStrip hasFile={!!imageUrl} filterLabel={activeFilterLabel} isAnimating={isAnimating} vrEnabled={vrEnabled} />
         <div className="workspace-grid">
           <div className="vortex-shell">
             <div
