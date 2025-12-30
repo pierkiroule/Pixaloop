@@ -204,7 +204,6 @@ const RadialMenu = ({ open, onSelect, activeTool, isAnimating, activeTab }) => {
             aria-label={item.label}
           >
             <Icon size={18} />
-            <span>{item.label}</span>
           </button>
         );
       })}

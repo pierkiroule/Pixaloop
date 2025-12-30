@@ -1024,7 +1024,7 @@ body {
 
 .radial-menu {
   position: absolute;
-  inset: -14%;
+  inset: -32%;
   display: grid;
   place-items: center;
   pointer-events: none;
@@ -1040,32 +1040,23 @@ body {
 }
 
 .radial-item {
-  --radius: 62%;
+  --radius: 78%;
   position: absolute;
-  width: 120px;
-  height: 44px;
-  border-radius: 999px;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  padding: 10px 14px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   color: #e2e8f0;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-weight: 800;
   cursor: pointer;
   backdrop-filter: blur(6px);
   box-shadow: 0 14px 35px rgba(0, 0, 0, 0.4);
   transform: rotate(calc(var(--slice) * 90deg)) translateY(calc(-1 * var(--radius)))
     rotate(calc(-1 * var(--slice) * 90deg));
   transition: transform 140ms ease, background 150ms ease, color 150ms ease, border 150ms ease;
-}
-
-.radial-item span {
-  font-size: 11px;
 }
 
 .radial-item.active {
