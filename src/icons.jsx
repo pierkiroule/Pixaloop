@@ -61,3 +61,4 @@ export const Upload = createIcon(['M12 4v12', 'M8 8l4-4 4 4', 'M4 18h16']);
 export const Wand2 = createIcon(['M5 20l14-14', 'M15 6l3-3', 'M9 10l-3 3', 'M19 11l1 1', 'M7 3l1 1']);
 export const Wind = createIcon(['M4 8h9a3 3 0 100-6', 'M2 12h14a3 3 0 010 6h-2', 'M5 16h7']);
 export const Zap = createIcon(['M13 2l-8 12h7l-1 8 8-12h-7z']);
+export const X = createIcon(['M18 6L6 18', 'M6 6l12 12']);

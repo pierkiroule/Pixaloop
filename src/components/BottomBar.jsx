@@ -2,10 +2,10 @@ import PropTypes from '../propTypesStub';
 import { Camera, Droplets, Image as ImageIcon, Wind } from '../icons';
 
 const tabs = [
+  { id: 'media', label: 'Média', icon: ImageIcon },
   { id: 'scene', label: 'Mouvement', icon: Wind },
   { id: 'paint', label: 'Peinture', icon: Droplets },
   { id: 'export', label: 'Export', icon: Camera },
-  { id: 'media', label: 'Média', icon: ImageIcon },
 ];
 
 function BottomBar({ activeTab, onChange }) {
