@@ -25,6 +25,7 @@ import { registerFloatingParticles } from './aframe/particles';
 import './App.css';
 import DrawingLooper from './DrawingLooper';
 import PropTypes from './propTypesStub';
+import BottomBar from './components/BottomBar';
 
 const CANVAS_SIZE = 1024;
 const PREVIEW_SIZE = 512;
@@ -842,6 +843,7 @@ function App() {
     { id: 'scene', label: 'Production', icon: LayoutPanelLeft },
     { id: 'paint', label: 'Aquarelle', icon: Palette },
     { id: 'export', label: 'Export', icon: Camera },
+    { id: 'media', label: 'Média', icon: ImageIcon },
   ];
 
   const watercolorPalette = ['#6fb0ff', '#f472b6', '#facc15', '#34d399', '#a78bfa', '#f97316'];
@@ -878,6 +880,13 @@ function App() {
       </header>
 
       <main className="stage">
+        <BottomBar
+          activeTab={activeTab}
+          onChange={(tabId) => {
+            setActiveTab(tabId);
+            setIsNavOpen(true);
+          }}
+        />
         <div className="workspace-grid">
           <div className="vortex-shell">
             <div
