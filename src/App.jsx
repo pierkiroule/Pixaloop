@@ -739,29 +739,49 @@ function App() {
       stopVideoStream(panelVideoRef.current);
       return;
     }
+
     ensureAFrameLoaded()
       .then(() => {
+        const applyVideo = (videoEl, sourceUrl) => {
+          if (!videoEl) return;
+          stopVideoStream(videoEl);
+          videoEl.src = sourceUrl;
+          videoEl.loop = true;
+          videoEl.muted = true;
+          videoEl.playsInline = true;
+          videoEl.play().catch(() => {});
+        };
+
+        const shouldRenderPanel = isDesktop;
         if (useLooperForSkybox && looperVideoUrl) {
-          const applyVideo = (videoEl) => {
-            if (!videoEl) return;
-            stopVideoStream(videoEl);
-            videoEl.src = looperVideoUrl;
-            videoEl.loop = true;
-            videoEl.muted = true;
-            videoEl.playsInline = true;
-            videoEl.play().catch(() => {});
-          };
-          applyVideo(skyboxVideoRef.current);
-          applyVideo(panelVideoRef.current);
-        } else {
-          startVideoStream(masterCanvasRef.current, skyboxVideoRef.current);
+          applyVideo(skyboxVideoRef.current, looperVideoUrl);
+          if (shouldRenderPanel) {
+            applyVideo(panelVideoRef.current, looperVideoUrl);
+          } else {
+            stopVideoStream(panelVideoRef.current);
+          }
+          return;
+        }
+
+        startVideoStream(masterCanvasRef.current, skyboxVideoRef.current);
+        if (shouldRenderPanel) {
           startVideoStream(canvasRef.current, panelVideoRef.current);
+        } else {
+          stopVideoStream(panelVideoRef.current);
         }
       })
       .catch(() => {
         setVrEnabled(false);
       });
-  }, [vrEnabled, ensureAFrameLoaded, startVideoStream, stopVideoStream, looperVideoUrl, useLooperForSkybox]);
+  }, [
+    vrEnabled,
+    ensureAFrameLoaded,
+    startVideoStream,
+    stopVideoStream,
+    looperVideoUrl,
+    useLooperForSkybox,
+    isDesktop,
+  ]);
 
   const renderPreviewLayer = useCallback(() => {
     const previewCanvas = previewCanvasRef.current;
@@ -1294,14 +1314,16 @@ function App() {
 
               <a-entity id="vortex-rig" position="0 1.6 0">
                 <a-camera wasd-controls-enabled="false" look-controls="magicWindowTrackingEnabled: true; touchEnabled: true">
-                  <a-entity id="panel-anchor" position="0 0 -1.8">
-                    <a-circle
-                      src="#panelVideo"
-                      radius="1.2"
-                      position="0 0 0"
-                      material="side: double; transparent: true; opacity: 0.95"
-                    />
-                  </a-entity>
+                  {isDesktop && (
+                    <a-entity id="panel-anchor" position="0 0 -1.8">
+                      <a-circle
+                        src="#panelVideo"
+                        radius="1.2"
+                        position="0 0 0"
+                        material="side: double; transparent: true; opacity: 0.95"
+                      />
+                    </a-entity>
+                  )}
                 </a-camera>
               </a-entity>
 
