@@ -7,7 +7,6 @@ import {
   Eye,
   Globe,
   Image as ImageIcon,
-  LayoutPanelLeft,
   Menu,
   Monitor,
   Palette,
@@ -25,6 +24,7 @@ import { registerFloatingParticles } from './aframe/particles';
 import './App.css';
 import DrawingLooper from './DrawingLooper';
 import BottomBar from './components/BottomBar';
+import BottomSheet from './components/BottomSheet';
 import QuickFab from './components/QuickFab';
 
 const CANVAS_SIZE = 1024;
@@ -233,6 +233,7 @@ function App() {
   const [tool, setTool] = useState('flow');
   const [isNavOpen, setIsNavOpen] = useState(true);
   const [activeTab, setActiveTab] = useState('scene');
+  const [isDesktop, setIsDesktop] = useState(false);
   const [watercolorColor, setWatercolorColor] = useState('#6fb0ff');
   const [watercolorSize, setWatercolorSize] = useState(48);
   const [watercolorWetness, setWatercolorWetness] = useState(0.75);
@@ -272,6 +273,21 @@ function App() {
     duration: 5,
     frameId: null,
   });
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(min-width: 900px)');
+    const handleChange = () => setIsDesktop(mediaQuery.matches);
+
+    handleChange();
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
+  useEffect(() => {
+    if (isDesktop) {
+      setIsNavOpen(true);
+    }
+  }, [isDesktop]);
 
   const drawImageToCanvas = useCallback((imageElement, target) => {
     const canvas = target;
@@ -798,13 +814,255 @@ function App() {
   }, []);
 
   const tabs = [
-    { id: 'scene', label: 'Production', icon: LayoutPanelLeft },
-    { id: 'paint', label: 'Aquarelle', icon: Palette },
-    { id: 'export', label: 'Export', icon: Camera },
     { id: 'media', label: 'Média', icon: ImageIcon },
+    { id: 'scene', label: 'Mouvement', icon: Wind },
+    { id: 'paint', label: 'Peinture', icon: Palette },
+    { id: 'export', label: 'Export', icon: Camera },
   ];
 
   const watercolorPalette = ['#6fb0ff', '#f472b6', '#facc15', '#34d399', '#a78bfa', '#f97316'];
+
+  const renderSheetContent = () => {
+    switch (activeTab) {
+      case 'media':
+        return (
+          <section className="panel-card">
+            <div className="card-header">
+              <div>
+                <p className="chip">Média</p>
+                <h3>Import & Setup</h3>
+              </div>
+              <Wand2 size={18} className="muted-icon" />
+            </div>
+            <p className="muted">Importez ou remplacez une image source, puis configurez vos flux.</p>
+            <div className="inline-actions">
+              <label className="inline-upload">
+                <Upload size={16} />
+                <span>{imageUrl ? 'Remplacer l’image' : 'Importer une image'}</span>
+                <input type="file" accept="image/*" onChange={handleUpload} />
+              </label>
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={() => {
+                  setPaths([]);
+                  setAnchors([]);
+                  clearWatercolor();
+                }}
+              >
+                <Trash2 size={16} />
+                Réinitialiser la scène
+              </button>
+            </div>
+          </section>
+        );
+      case 'scene':
+        return (
+          <>
+            <section className="panel-card">
+              <div className="card-header">
+                <div>
+                  <p className="chip">Mouvement</p>
+                  <h3>Flux & Ancrages</h3>
+                </div>
+                <Wind size={18} className="muted-icon" />
+              </div>
+              <p className="muted">Activez l’outil de flux ou d’ancrage puis dessinez directement dans le vortex.</p>
+              <div className="inline-actions subtle">
+                <button className={`pill ${tool === 'flow' ? 'active' : ''}`} type="button" onClick={() => setTool('flow')}>
+                  <Wind size={16} /> Dessin Flux
+                </button>
+                <button className={`pill ${tool === 'anchor' ? 'active' : ''}`} type="button" onClick={() => setTool('anchor')}>
+                  <Anchor size={16} /> Ancrages
+                </button>
+              </div>
+            </section>
+            {imageUrl ? (
+              <section className="panel-card">
+                <div className="card-header">
+                  <div>
+                    <p className="chip">Direction</p>
+                    <h3>Filtres & Styles</h3>
+                  </div>
+                  <Cloud size={18} className="muted-icon" />
+                </div>
+                <p className="muted">Dessinez les flux de mouvement ou ajoutez des ancres, puis sélectionnez un style visuel.</p>
+                <div className="filter-rail">
+                  {FILTERS.map((filter) => {
+                    const Icon = ICONS[filter.icon] || ImageIcon;
+                    return (
+                      <button
+                        key={filter.id}
+                        type="button"
+                        className={`filter ${filterType === filter.id ? 'active' : ''}`}
+                        onClick={() => setFilterType(filter.id)}
+                        title={filter.label}
+                      >
+                        <Icon size={18} />
+                        <span className="filter-label">{filter.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            ) : (
+              <section className="panel-card">
+                <p className="muted">Importez une image pour définir le mouvement et accéder aux filtres.</p>
+              </section>
+            )}
+          </>
+        );
+      case 'paint':
+        return (
+          <section className="panel-card">
+            <div className="card-header">
+              <div>
+                <p className="chip">Peinture</p>
+                <h3>Pinceau Aquarelle</h3>
+              </div>
+              <Palette size={18} className="muted-icon" />
+            </div>
+            <p className="muted">
+              Ajoutez des touches aquarelle directement sur la scène. Ces lavis seront animés et présents dans vos exports vidéo.
+            </p>
+            {imageUrl ? (
+              <>
+                <div className="inline-actions">
+                  <button
+                    type="button"
+                    className={`primary-control ${tool === 'watercolor' ? 'active' : ''}`}
+                    onClick={() => setTool('watercolor')}
+                  >
+                    <Droplets size={16} /> Activer le pinceau
+                  </button>
+                  <button type="button" className="ghost-button" onClick={clearWatercolor}>
+                    <Trash2 size={16} /> Nettoyer la couche
+                  </button>
+                </div>
+                <div className="color-palette">
+                  {watercolorPalette.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      className={`color-chip ${watercolorColor === color ? 'active' : ''}`}
+                      style={{ backgroundColor: color }}
+                      onClick={() => setWatercolorColor(color)}
+                      aria-label={`Couleur ${color}`}
+                    />
+                  ))}
+                </div>
+                <div className="slider-field">
+                  <label htmlFor="brush-size">
+                    Taille du pinceau
+                    <span>{Math.round(watercolorSize)} px</span>
+                  </label>
+                  <input
+                    id="brush-size"
+                    type="range"
+                    min="20"
+                    max="120"
+                    step="2"
+                    value={watercolorSize}
+                    onChange={(e) => setWatercolorSize(Number(e.target.value))}
+                  />
+                </div>
+                <div className="slider-field">
+                  <label htmlFor="brush-wet">
+                    Humidité
+                    <span>{Math.round(watercolorWetness * 100)}%</span>
+                  </label>
+                  <input
+                    id="brush-wet"
+                    type="range"
+                    min="0.25"
+                    max="1"
+                    step="0.05"
+                    value={watercolorWetness}
+                    onChange={(e) => setWatercolorWetness(Number(e.target.value))}
+                  />
+                </div>
+              </>
+            ) : (
+              <p className="muted subtle-text">Importez une image pour activer le pinceau aquarelle.</p>
+            )}
+          </section>
+        );
+      case 'export':
+        return (
+          <>
+            <section className="panel-card">
+              <div className="card-header">
+                <div>
+                  <p className="chip">Export</p>
+                  <h3>Rendus & VR</h3>
+                </div>
+                <Camera size={18} className="muted-icon" />
+              </div>
+              <p className="muted">Lancez l’animation, exportez en 2D ou 360°, ou ouvrez la bulle VR.</p>
+              <div className="inline-actions">
+                <button
+                  className={`primary-control ${isAnimating ? 'active' : ''}`}
+                  type="button"
+                  onClick={() => setIsAnimating((prev) => !prev)}
+                  disabled={!imageUrl}
+                >
+                  {isAnimating ? <Pause size={16} /> : <Play size={16} />}
+                  {isAnimating ? 'Stop' : 'Animer'}
+                </button>
+                <button className="primary-control" type="button" onClick={() => startRecording('2D')} disabled={!imageUrl}>
+                  <Camera size={16} /> Export 2D
+                </button>
+                <button className="primary-control" type="button" onClick={() => startRecording('360')} disabled={!imageUrl}>
+                  <Globe size={16} /> Export 360°
+                </button>
+              </div>
+              <div className="inline-actions subtle">
+                <button className={`pill ${vrEnabled ? 'active' : ''}`} type="button" onClick={() => setVrEnabled((prev) => !prev)}>
+                  <Sparkles size={16} /> VR Bubble
+                </button>
+                <button
+                  className={`pill ${preview2DEnabled ? 'active' : ''}`}
+                  type="button"
+                  onClick={() => setPreview2DEnabled((prev) => !prev)}
+                >
+                  <Eye size={16} /> Aperçu 2D
+                </button>
+                <button
+                  className={`pill ${useLooperForSkybox ? 'active' : ''}`}
+                  type="button"
+                  disabled={!looperVideoUrl}
+                  onClick={() => {
+                    if (!looperVideoUrl) return;
+                    setUseLooperForSkybox((prev) => !prev);
+                    setVrEnabled(true);
+                  }}
+                >
+                  <Sparkles size={16} /> Skybox Looper
+                </button>
+              </div>
+            </section>
+            <section className="panel-card looper-card">
+              <div className="card-header">
+                <div>
+                  <p className="chip">Nouveau</p>
+                  <h3>Drawing Looper</h3>
+                </div>
+                <Sparkles size={18} className="muted-icon" />
+              </div>
+              <p className="muted">
+                Créez une boucle ping-pong 5s pour servir de texture skybox ou panneau VR. L’export 10s se télécharge et peut être routé vers la bulle VR.
+              </p>
+              <DrawingLooper onLoopReady={handleLooperReady} />
+              {!looperVideoUrl && <p className="muted subtle-text">Générez une boucle pour activer le routage VR.</p>}
+            </section>
+          </>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const activeSheet = tabs.find((tab) => tab.id === activeTab);
 
   return (
     <div className="app-shell">
@@ -935,256 +1193,17 @@ function App() {
             </div>
           </div>
 
-          <aside className={`control-panel ${isNavOpen ? 'open' : ''}`}>
-            <div className="panel-tabs">
-              {tabs.map((tab) => {
-                const Icon = tab.icon;
-                return (
-                  <button
-                    key={tab.id}
-                    className={`panel-tab ${activeTab === tab.id ? 'active' : ''}`}
-                    type="button"
-                    onClick={() => setActiveTab(tab.id)}
-                  >
-                    <Icon size={16} />
-                    <span>{tab.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="panel-scroll">
-              <section className="panel-card">
-                <div className="card-header">
-                  <div>
-                    <p className="chip">Média</p>
-                    <h3>Import & Setup</h3>
-                  </div>
-                  <Wand2 size={18} className="muted-icon" />
-                </div>
-                <p className="muted">Importez ou remplacez une image source, puis configurez vos flux.</p>
-                <div className="inline-actions">
-                  <label className="inline-upload">
-                    <Upload size={16} />
-                    <span>{imageUrl ? 'Remplacer l’image' : 'Importer une image'}</span>
-                    <input type="file" accept="image/*" onChange={handleUpload} />
-                  </label>
-                  <button
-                    className="ghost-button"
-                    type="button"
-                    onClick={() => {
-                      setPaths([]);
-                      setAnchors([]);
-                      clearWatercolor();
-                    }}
-                  >
-                    <Trash2 size={16} />
-                    Réinitialiser la scène
-                  </button>
-                </div>
-                <div className="inline-actions subtle">
-                  <button
-                    className={`pill ${tool === 'flow' ? 'active' : ''}`}
-                    type="button"
-                    onClick={() => {
-                      setTool('flow');
-                      setActiveTab('scene');
-                    }}
-                  >
-                    <Wind size={16} /> Dessin Flux
-                  </button>
-                  <button
-                    className={`pill ${tool === 'anchor' ? 'active' : ''}`}
-                    type="button"
-                    onClick={() => {
-                      setTool('anchor');
-                      setActiveTab('scene');
-                    }}
-                  >
-                    <Anchor size={16} /> Ancrages
-                  </button>
-                  <button
-                    className={`pill ${tool === 'watercolor' ? 'active' : ''}`}
-                    type="button"
-                    onClick={() => {
-                      setTool('watercolor');
-                      setActiveTab('paint');
-                    }}
-                  >
-                    <Droplets size={16} /> Aquarelle
-                  </button>
-                </div>
-              </section>
-
-              {imageUrl && activeTab === 'scene' && (
-                <section className="panel-card">
-                  <div className="card-header">
-                    <div>
-                      <p className="chip">Direction</p>
-                      <h3>Flux & Filtres</h3>
-                    </div>
-                    <LayoutPanelLeft size={18} className="muted-icon" />
-                  </div>
-                  <p className="muted">Dessinez les flux de mouvement ou ajoutez des ancres, puis sélectionnez un style visuel.</p>
-                  <div className="filter-rail">
-                    {FILTERS.map((filter) => {
-                      const Icon = ICONS[filter.icon] || ImageIcon;
-                      return (
-                        <button
-                          key={filter.id}
-                          type="button"
-                          className={`filter ${filterType === filter.id ? 'active' : ''}`}
-                          onClick={() => setFilterType(filter.id)}
-                          title={filter.label}
-                        >
-                          <Icon size={18} />
-                          <span className="filter-label">{filter.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </section>
-              )}
-
-              {imageUrl && activeTab === 'paint' && (
-                <section className="panel-card">
-                  <div className="card-header">
-                    <div>
-                      <p className="chip">Peinture</p>
-                      <h3>Pinceau Aquarelle</h3>
-                    </div>
-                    <Palette size={18} className="muted-icon" />
-                  </div>
-                  <p className="muted">
-                    Ajoutez des touches aquarelle directement sur la scène. Ces lavis seront animés et présents dans vos exports vidéo.
-                  </p>
-                  <div className="inline-actions">
-                    <button
-                      type="button"
-                      className={`primary-control ${tool === 'watercolor' ? 'active' : ''}`}
-                      onClick={() => setTool('watercolor')}
-                    >
-                      <Droplets size={16} /> Activer le pinceau
-                    </button>
-                    <button type="button" className="ghost-button" onClick={clearWatercolor}>
-                      <Trash2 size={16} /> Nettoyer la couche
-                    </button>
-                  </div>
-                  <div className="color-palette">
-                    {watercolorPalette.map((color) => (
-                      <button
-                        key={color}
-                        type="button"
-                        className={`color-chip ${watercolorColor === color ? 'active' : ''}`}
-                        style={{ backgroundColor: color }}
-                        onClick={() => setWatercolorColor(color)}
-                        aria-label={`Couleur ${color}`}
-                      />
-                    ))}
-                  </div>
-                  <div className="slider-field">
-                    <label htmlFor="brush-size">
-                      Taille du pinceau
-                      <span>{Math.round(watercolorSize)} px</span>
-                    </label>
-                    <input
-                      id="brush-size"
-                      type="range"
-                      min="20"
-                      max="120"
-                      step="2"
-                      value={watercolorSize}
-                      onChange={(e) => setWatercolorSize(Number(e.target.value))}
-                    />
-                  </div>
-                  <div className="slider-field">
-                    <label htmlFor="brush-wet">
-                      Humidité
-                      <span>{Math.round(watercolorWetness * 100)}%</span>
-                    </label>
-                    <input
-                      id="brush-wet"
-                      type="range"
-                      min="0.25"
-                      max="1"
-                      step="0.05"
-                      value={watercolorWetness}
-                      onChange={(e) => setWatercolorWetness(Number(e.target.value))}
-                    />
-                  </div>
-                </section>
-              )}
-
-              {imageUrl && activeTab === 'export' && (
-                <section className="panel-card">
-                  <div className="card-header">
-                    <div>
-                      <p className="chip">Export</p>
-                      <h3>Rendus & VR</h3>
-                    </div>
-                    <Camera size={18} className="muted-icon" />
-                  </div>
-                  <p className="muted">Capturez vos aquarelles animées en boucle 2D ou 360°, ou ouvrez la bulle VR.</p>
-                  <div className="inline-actions">
-                    <button className="primary-control" type="button" onClick={() => startRecording('2D')}>
-                      <Camera size={16} /> Export 2D
-                    </button>
-                    <button className="primary-control" type="button" onClick={() => startRecording('360')}>
-                      <Globe size={16} /> Export 360°
-                    </button>
-                  </div>
-                  <div className="inline-actions subtle">
-                    <button
-                      className={`pill ${vrEnabled ? 'active' : ''}`}
-                      type="button"
-                      onClick={() => setVrEnabled((prev) => !prev)}
-                    >
-                      <Sparkles size={16} /> VR Bubble
-                    </button>
-                    <button
-                      className={`pill ${preview2DEnabled ? 'active' : ''}`}
-                      type="button"
-                      onClick={() => setPreview2DEnabled((prev) => !prev)}
-                    >
-                      <Eye size={16} /> Aperçu 2D
-                    </button>
-                    <button
-                      className={`pill ${useLooperForSkybox ? 'active' : ''}`}
-                      type="button"
-                      disabled={!looperVideoUrl}
-                      onClick={() => {
-                        if (!looperVideoUrl) return;
-                        setUseLooperForSkybox((prev) => !prev);
-                        setVrEnabled(true);
-                      }}
-                    >
-                      <Sparkles size={16} /> Skybox Looper
-                    </button>
-                  </div>
-                </section>
-              )}
-
-              {activeTab === 'export' && (
-                <section className="panel-card looper-card">
-                  <div className="card-header">
-                    <div>
-                      <p className="chip">Nouveau</p>
-                      <h3>Drawing Looper</h3>
-                    </div>
-                    <Sparkles size={18} className="muted-icon" />
-                  </div>
-                  <p className="muted">
-                    Créez une boucle ping-pong 5s pour servir de texture skybox ou panneau VR. L’export 10s se télécharge et peut être routé vers la bulle VR.
-                  </p>
-                  <DrawingLooper onLoopReady={handleLooperReady} />
-                  {!looperVideoUrl && <p className="muted subtle-text">Générez une boucle pour activer le routage VR.</p>}
-                </section>
-              )}
-            </div>
-          </aside>
-
-          {isNavOpen && <button className="panel-overlay" type="button" onClick={() => setIsNavOpen(false)} aria-label="Fermer le menu" />}
         </div>
+
+        <BottomSheet
+          open={isNavOpen}
+          onClose={() => setIsNavOpen(false)}
+          title={activeSheet?.label || 'Panneau'}
+          icon={activeSheet?.icon}
+          desktopMode={isDesktop}
+        >
+          {renderSheetContent()}
+        </BottomSheet>
 
         <QuickFab
           hasImage={!!imageUrl}
