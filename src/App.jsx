@@ -1311,18 +1311,20 @@ function App() {
                 <video id="panelVideo" ref={panelVideoRef} crossOrigin="anonymous" playsInline muted loop />
               </a-assets>
 
-              <a-entity position="0 1.6 0">
-                <a-camera wasd-controls-enabled="false" look-controls="magicWindowTrackingEnabled: true; touchEnabled: true" />
+              <a-entity id="vortex-rig" position="0 1.6 0">
+                <a-camera wasd-controls-enabled="false" look-controls="magicWindowTrackingEnabled: true; touchEnabled: true">
+                  <a-entity id="panel-anchor" position="0 0 -1.8">
+                    <a-circle
+                      src="#panelVideo"
+                      radius="1.2"
+                      position="0 0 0"
+                      material="side: double; transparent: true; opacity: 0.95"
+                    />
+                  </a-entity>
+                </a-camera>
               </a-entity>
 
               <a-videosphere src="#skyboxVideo" rotation="0 180 0" segments-height="64" segments-width="128" />
-              <a-circle
-                src="#panelVideo"
-                radius="1.2"
-                position="0 1.6 -2.4"
-                rotation="-5 0 0"
-                material="side: double; transparent: true; opacity: 0.95"
-              />
 
               <a-entity light="type: ambient; intensity: 0.35" />
               <a-entity light="type: point; intensity: 0.8; distance: 6" position="0 2 -1" />
