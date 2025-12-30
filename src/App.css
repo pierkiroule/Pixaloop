@@ -1024,7 +1024,7 @@ body {
 
 .radial-menu {
   position: absolute;
-  inset: 0;
+  inset: -14%;
   display: grid;
   place-items: center;
   pointer-events: none;
@@ -1040,7 +1040,7 @@ body {
 }
 
 .radial-item {
-  --radius: 44%;
+  --radius: 62%;
   position: absolute;
   width: 120px;
   height: 44px;
