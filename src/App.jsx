@@ -24,6 +24,7 @@ import {
 import { registerFloatingParticles } from './aframe/particles';
 import './App.css';
 import DrawingLooper from './DrawingLooper';
+import PropTypes from './propTypesStub';
 
 const CANVAS_SIZE = 1024;
 const PREVIEW_SIZE = 512;
@@ -177,11 +178,102 @@ const fragmentShader = `
   }
 `;
 
+const RadialMenu = ({ open, onSelect, activeTool, isAnimating, activeTab }) => {
+  const items = [
+    { id: 'import', label: 'Import', icon: Upload },
+    { id: 'paint', label: 'Peindre', icon: Droplets },
+    { id: 'animate', label: isAnimating ? 'Stop' : 'Animer', icon: isAnimating ? Pause : Play, active: isAnimating },
+    { id: 'export', label: 'Exporter', icon: Camera },
+  ];
+
+  return (
+    <div className={`radial-menu ${open ? 'open' : ''}`}>
+      {items.map((item, index) => {
+        const Icon = item.icon;
+        const isActive =
+          item.active ||
+          (item.id === 'paint' && activeTool === 'watercolor') ||
+          (item.id === 'export' && activeTab === 'export');
+        return (
+          <button
+            key={item.id}
+            type="button"
+            className={`radial-item ${isActive ? 'active' : ''}`}
+            style={{ '--slice': index }}
+            onClick={() => onSelect(item.id)}
+            aria-label={item.label}
+          >
+            <Icon size={18} />
+            <span>{item.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+RadialMenu.propTypes = {
+  open: PropTypes.bool,
+  onSelect: PropTypes.func,
+  activeTool: PropTypes.string,
+  isAnimating: PropTypes.bool,
+  activeTab: PropTypes.string,
+};
+
+const clampToVortex = (point) => {
+  const dx = point.x - 0.5;
+  const dy = point.y - 0.5;
+  const radius = Math.sqrt(dx * dx + dy * dy);
+  const maxRadius = 0.5;
+
+  if (radius > maxRadius) {
+    const scale = maxRadius / radius;
+    return {
+      x: 0.5 + dx * scale,
+      y: 0.5 + dy * scale,
+    };
+  }
+  return point;
+};
+
+const cartesianToPolar = (point) => {
+  const dx = point.x - 0.5;
+  const dy = point.y - 0.5;
+  return {
+    angle: Math.atan2(dy, dx),
+    radius: Math.min(Math.sqrt(dx * dx + dy * dy), 0.5),
+  };
+};
+
+const polarToCartesian = (angle, radius) => ({
+  x: 0.5 + Math.cos(angle) * radius,
+  y: 0.5 + Math.sin(angle) * radius,
+});
+
+const blendAngle = (a, b, t) => {
+  const diff = ((b - a + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+  return a + diff * t;
+};
+
+const curveTowardVortex = (nextPoint, previousPoint) => {
+  const clamped = clampToVortex(nextPoint);
+  const polarNext = cartesianToPolar(clamped);
+  if (!previousPoint) {
+    return polarToCartesian(polarNext.angle, polarNext.radius);
+  }
+
+  const polarPrev = cartesianToPolar(previousPoint);
+  const easedAngle = blendAngle(polarPrev.angle, polarNext.angle, 0.65);
+  const easedRadius = polarPrev.radius * 0.35 + polarNext.radius * 0.65;
+  return polarToCartesian(easedAngle, Math.min(0.5, easedRadius));
+};
+
 function App() {
   const [imageUrl, setImageUrl] = useState(null);
   const [isAnimating, setIsAnimating] = useState(false);
   const [tool, setTool] = useState('flow');
   const [isNavOpen, setIsNavOpen] = useState(true);
+  const [isRadialOpen, setIsRadialOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('scene');
   const [watercolorColor, setWatercolorColor] = useState('#6fb0ff');
   const [watercolorSize, setWatercolorSize] = useState(48);
@@ -205,6 +297,7 @@ function App() {
   const sourceCompositeRef = useRef(null);
   const previewCanvasRef = useRef(null);
   const imgRef = useRef(null);
+  const fileInputRef = useRef(null);
   const skyboxVideoRef = useRef(null);
   const panelVideoRef = useRef(null);
   const aframeReady = useRef(null);
@@ -555,22 +648,23 @@ function App() {
     const rect = event.currentTarget.getBoundingClientRect();
     const x = (event.clientX - rect.left) / rect.width;
     const y = (event.clientY - rect.top) / rect.height;
+    const clamped = clampToVortex({ x, y });
 
     if (tool === 'anchor') {
-      setAnchors((prev) => [...prev, { x, y }]);
+      setAnchors((prev) => [...prev, clamped]);
       return;
     }
 
     if (tool === 'watercolor') {
       setIsDrawing(true);
-      watercolorStrokeRef.current = { x, y };
-      splatWatercolor({ x, y });
+      watercolorStrokeRef.current = clamped;
+      splatWatercolor(clamped);
       return;
     }
 
     event.currentTarget.setPointerCapture(event.pointerId);
     setIsDrawing(true);
-    setPaths((prev) => [...prev, [{ x, y }]]);
+    setPaths((prev) => [...prev, [clamped]]);
   };
 
   const handlePointerMove = (event) => {
@@ -578,21 +672,22 @@ function App() {
     const rect = event.currentTarget.getBoundingClientRect();
     const x = (event.clientX - rect.left) / rect.width;
     const y = (event.clientY - rect.top) / rect.height;
+    const clamped = clampToVortex({ x, y });
 
     if (tool === 'watercolor') {
       const last = watercolorStrokeRef.current;
-      const dx = x - (last?.x ?? x);
-      const dy = y - (last?.y ?? y);
+      const dx = clamped.x - (last?.x ?? clamped.x);
+      const dy = clamped.y - (last?.y ?? clamped.y);
       const dist = Math.hypot(dx, dy);
       const steps = Math.max(1, Math.floor(dist / 0.01));
       for (let i = 1; i <= steps; i += 1) {
         const t = i / steps;
         splatWatercolor({
-          x: (last?.x ?? x) + dx * t,
-          y: (last?.y ?? y) + dy * t,
+          x: (last?.x ?? clamped.x) + dx * t,
+          y: (last?.y ?? clamped.y) + dy * t,
         });
       }
-      watercolorStrokeRef.current = { x, y };
+      watercolorStrokeRef.current = clamped;
       return;
     }
 
@@ -601,9 +696,10 @@ function App() {
       const current = updated[updated.length - 1];
       if (!current) return prev;
       const lastPoint = current[current.length - 1];
-      const dist = Math.hypot(x - lastPoint.x, y - lastPoint.y);
+      const curvedPoint = curveTowardVortex(clamped, lastPoint);
+      const dist = Math.hypot(curvedPoint.x - lastPoint.x, curvedPoint.y - lastPoint.y);
       if (dist > 0.005) {
-        current.push({ x, y });
+        current.push(curvedPoint);
         return updated;
       }
       return prev;
@@ -753,6 +849,7 @@ function App() {
 
   return (
     <div className="app-shell">
+      <input ref={fileInputRef} type="file" accept="image/*" className="hidden-file-input" onChange={handleUpload} />
       <header className="app-header">
         <div className="branding">
           <div className="logo-chip">
@@ -783,91 +880,136 @@ function App() {
 
       <main className="stage">
         <div className="workspace-grid">
-          <div
-            className="canvas-area"
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={stopDrawing}
-            onPointerCancel={stopDrawing}
-          >
-            {imageUrl ? (
-              <div className="canvas-stack">
-                <canvas ref={canvasRef} width={CANVAS_SIZE} height={CANVAS_SIZE} className="flow-canvas" />
+          <div className="vortex-shell">
+            <div
+              className="canvas-area"
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={stopDrawing}
+              onPointerCancel={stopDrawing}
+            >
+              {imageUrl ? (
+                <div className="canvas-stack">
+                  <canvas ref={canvasRef} width={CANVAS_SIZE} height={CANVAS_SIZE} className="flow-canvas" />
 
-                <div className="skybox-monitor">
-                  <canvas
-                    ref={(el) => {
-                      if (!el) return;
-                      const draw = () => {
-                        if (masterCanvasRef.current) {
-                          const ctx = el.getContext('2d');
-                          ctx.drawImage(
-                            masterCanvasRef.current,
-                            0,
-                            0,
-                            MASTER_WIDTH,
-                            MASTER_HEIGHT,
-                            0,
-                            0,
-                            el.width,
-                            el.height,
-                          );
-                        }
-                        requestAnimationFrame(draw);
-                      };
-                      draw();
-                    }}
-                    width={240}
-                    height={120}
-                    className="monitor-canvas"
-                  />
-                  <div className="monitor-label">
-                    <Globe size={12} /> 4K Skybox Master
+                  <div className="skybox-monitor">
+                    <canvas
+                      ref={(el) => {
+                        if (!el) return;
+                        const draw = () => {
+                          if (masterCanvasRef.current) {
+                            const ctx = el.getContext('2d');
+                            ctx.drawImage(
+                              masterCanvasRef.current,
+                              0,
+                              0,
+                              MASTER_WIDTH,
+                              MASTER_HEIGHT,
+                              0,
+                              0,
+                              el.width,
+                              el.height,
+                            );
+                          }
+                          requestAnimationFrame(draw);
+                        };
+                        draw();
+                      }}
+                      width={240}
+                      height={120}
+                      className="monitor-canvas"
+                    />
+                    <div className="monitor-label">
+                      <Globe size={12} /> 4K Skybox Master
+                    </div>
                   </div>
-                </div>
 
-                {!isAnimating && (
-                  <svg className="flow-overlay" viewBox="0 0 1000 1000" preserveAspectRatio="none">
-                    {anchors.map((anchor, index) => (
-                      <circle
-                        key={`anchor-${index}`}
-                        cx={anchor.x * 1000}
-                        cy={anchor.y * 1000}
-                        r="15"
-                        fill="#ef4444"
-                        stroke="white"
-                        strokeWidth="4"
-                      />
-                    ))}
-                    {paths.map((path, index) => (
-                      <polyline
-                        // eslint-disable-next-line react/no-array-index-key
-                        key={`path-${index}`}
-                        points={path.map((p) => `${p.x * 1000},${p.y * 1000}`).join(' ')}
-                        fill="none"
-                        stroke="#6366f1"
-                        strokeWidth="30"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        opacity="0.4"
-                      />
-                    ))}
-                  </svg>
-                )}
-                {preview2DEnabled && (
-                  <canvas ref={previewCanvasRef} width={PREVIEW_SIZE} height={PREVIEW_SIZE} className="preview-layer" />
-                )}
-              </div>
-            ) : (
-              <label className="upload-drop">
-                <Monitor size={72} />
-                <div>
-                  <p className="eyebrow">Importer Image</p>
-                  <p className="muted">Démarrer une production 360° VR</p>
+                  {!isAnimating && (
+                    <svg className="flow-overlay" viewBox="0 0 1000 1000" preserveAspectRatio="none">
+                      {anchors.map((anchor, index) => (
+                        <circle
+                          key={`anchor-${index}`}
+                          cx={anchor.x * 1000}
+                          cy={anchor.y * 1000}
+                          r="15"
+                          fill="#ef4444"
+                          stroke="white"
+                          strokeWidth="4"
+                        />
+                      ))}
+                      {paths.map((path, index) => (
+                        <polyline
+                          // eslint-disable-next-line react/no-array-index-key
+                          key={`path-${index}`}
+                          points={path.map((p) => `${p.x * 1000},${p.y * 1000}`).join(' ')}
+                          fill="none"
+                          stroke="#6366f1"
+                          strokeWidth="30"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          opacity="0.4"
+                        />
+                      ))}
+                    </svg>
+                  )}
+                  {preview2DEnabled && (
+                    <canvas ref={previewCanvasRef} width={PREVIEW_SIZE} height={PREVIEW_SIZE} className="preview-layer" />
+                  )}
                 </div>
-                <input type="file" accept="image/*" onChange={handleUpload} />
-              </label>
-            )}
+              ) : (
+                <label className="upload-drop">
+                  <Monitor size={72} />
+                  <div>
+                    <p className="eyebrow">Importer Image</p>
+                    <p className="muted">Démarrer une production 360° VR</p>
+                  </div>
+                  <input type="file" accept="image/*" onChange={handleUpload} />
+                </label>
+              )}
+            </div>
+            <div className="vortex-dial">
+              <p className="vortex-label">Vortex UI</p>
+              <button type="button" className="dial-core" onClick={() => setIsRadialOpen((prev) => !prev)} aria-label="Ouvrir le menu radial">
+                <Menu size={20} />
+              </button>
+            </div>
+            <RadialMenu
+              open={isRadialOpen}
+              activeTool={tool === 'watercolor' ? 'watercolor' : tool}
+              isAnimating={isAnimating}
+              activeTab={activeTab}
+              onSelect={(id) => {
+                if (id === 'export') {
+                  setActiveTab('export');
+                  setIsRadialOpen(false);
+                  return;
+                }
+                if (id === 'import') {
+                  fileInputRef.current?.click();
+                  setIsRadialOpen(false);
+                  return;
+                }
+                if (id === 'paint') {
+                  setTool('watercolor');
+                  setActiveTab('paint');
+                  setIsRadialOpen(false);
+                  return;
+                }
+                if (id === 'animate') {
+                  setIsAnimating((prev) => !prev);
+                  setIsRadialOpen(false);
+                  return;
+                }
+                if (id === 'anchor') {
+                  setTool('anchor');
+                  setActiveTab('scene');
+                } else {
+                  setTool('flow');
+                  setActiveTab('scene');
+                }
+                setIsRadialOpen(false);
+              }}
+            />
           </div>
 
           <aside className={`control-panel ${isNavOpen ? 'open' : ''}`}>
