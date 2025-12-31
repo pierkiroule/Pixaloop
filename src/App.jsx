@@ -233,7 +233,7 @@ function App() {
   const [isAnimating, setIsAnimating] = useState(false);
   const [tool, setTool] = useState('flow');
   const [isNavOpen, setIsNavOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState('scene');
+  const [activeTab, setActiveTab] = useState('flow');
   const [isDesktop, setIsDesktop] = useState(false);
   const [watercolorColor, setWatercolorColor] = useState('#6fb0ff');
   const [watercolorSize, setWatercolorSize] = useState(48);
@@ -835,6 +835,7 @@ function App() {
   }, []);
 
   const tabs = [
+    { id: 'flow', label: 'Parcours', icon: Sparkles },
     { id: 'media', label: 'Média', icon: ImageIcon },
     { id: 'scene', label: 'Mouvement', icon: Wind },
     { id: 'paint', label: 'Peinture', icon: Palette },
@@ -845,6 +846,49 @@ function App() {
 
   const renderSheetContent = () => {
     switch (activeTab) {
+      case 'flow':
+        return (
+          <section className="panel-card">
+            <div className="card-header">
+              <div>
+                <p className="chip">Guide</p>
+                <h3>Principe & Flow</h3>
+              </div>
+              <Sparkles size={18} className="muted-icon" />
+            </div>
+            <p className="muted">
+              Un atelier en trois temps : poser votre média, sculpter le mouvement, puis enrichir avec peinture et boucle dédiée avant d’exporter en 2D/360° ou VR.
+            </p>
+            <ol className="muted flow-steps">
+              <li>
+                <strong>1. Média</strong> — Importez l’image de base puis nettoyez la scène si besoin.
+              </li>
+              <li>
+                <strong>2. Mouvement</strong> — Dessinez les flux/ancres et appliquez un style visuel.
+              </li>
+              <li>
+                <strong>3. Peinture</strong> — Ajoutez l’aquarelle et générez la boucle looper 15s (export 30s) dédiée au panneau ou à la skybox.
+              </li>
+              <li>
+                <strong>4. Export</strong> — Lancez l’animation, exportez en 2D/360°, ou routez la boucle dans la bulle VR/Skybox.
+              </li>
+            </ol>
+            <div className="inline-actions subtle">
+              <button className="pill" type="button" onClick={() => setActiveTab('media')}>
+                <ImageIcon size={16} /> Aller à Média
+              </button>
+              <button className="pill" type="button" onClick={() => setActiveTab('scene')}>
+                <Wind size={16} /> Aller à Mouvement
+              </button>
+              <button className="pill" type="button" onClick={() => setActiveTab('paint')}>
+                <Palette size={16} /> Aller à Peinture
+              </button>
+              <button className="pill" type="button" onClick={() => setActiveTab('export')}>
+                <Camera size={16} /> Aller à Export
+              </button>
+            </div>
+          </section>
+        );
       case 'media':
         return (
           <section className="panel-card">
