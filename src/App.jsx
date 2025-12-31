@@ -15,7 +15,6 @@ import {
   Sparkles,
   Stars,
   Trash2,
-  Upload,
   Wand2,
   Wind,
   Zap,
@@ -23,6 +22,7 @@ import {
 import { registerFloatingParticles } from './aframe/particles';
 import './App.css';
 import DrawingLooper from './DrawingLooper';
+import SketchCanvas from './components/SketchCanvas';
 import BottomBar from './components/BottomBar';
 import BottomSheet from './components/BottomSheet';
 import QuickFab from './components/QuickFab';
@@ -228,12 +228,22 @@ const curveTowardVortex = (nextPoint, previousPoint) => {
   return polarToCartesian(easedAngle, Math.min(0.5, easedRadius));
 };
 
+const createBlankBase = () => {
+  const canvas = document.createElement('canvas');
+  canvas.width = CANVAS_SIZE;
+  canvas.height = CANVAS_SIZE;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fdfdf9';
+  ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+  return canvas.toDataURL('image/png');
+};
+
 function App() {
-  const [imageUrl, setImageUrl] = useState(null);
+  const [imageUrl, setImageUrl] = useState(() => createBlankBase());
   const [isAnimating, setIsAnimating] = useState(false);
   const [tool, setTool] = useState('flow');
   const [isNavOpen, setIsNavOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState('flow');
+  const [activeTab, setActiveTab] = useState('media');
   const [isDesktop, setIsDesktop] = useState(false);
   const [watercolorColor, setWatercolorColor] = useState('#6fb0ff');
   const [watercolorSize, setWatercolorSize] = useState(48);
@@ -257,7 +267,6 @@ function App() {
   const sourceCompositeRef = useRef(null);
   const previewCanvasRef = useRef(null);
   const imgRef = useRef(null);
-  const fileInputRef = useRef(null);
   const skyboxVideoRef = useRef(null);
   const panelVideoRef = useRef(null);
   const aframeReady = useRef(null);
@@ -540,29 +549,16 @@ function App() {
     return () => cancelAnimationFrame(engine.current.frameId);
   }, [filterType, isAnimating]);
 
-  const handleUpload = (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const url = URL.createObjectURL(file);
+  useEffect(() => {
+    if (!imageUrl) return;
     const tempImg = new Image();
     tempImg.onload = () => {
       imgRef.current = tempImg;
-      setImageUrl(url);
-      setPaths([]);
-      setAnchors([]);
-      const watercolorCanvas = watercolorCanvasRef.current;
-      watercolorCanvas?.getContext('2d')?.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-    };
-    tempImg.src = url;
-  };
-
-  useEffect(() => {
-    if (imageUrl && canvasRef.current && imgRef.current) {
-      setupWebGL(imgRef.current);
+      setupWebGL(tempImg);
       updateFlowMap();
       refreshSourceTexture();
-    }
+    };
+    tempImg.src = imageUrl;
   }, [imageUrl, refreshSourceTexture, setupWebGL, updateFlowMap]);
 
   useEffect(() => {
@@ -570,6 +566,11 @@ function App() {
       updateFlowMap();
     }
   }, [anchors, paths, imageUrl, updateFlowMap]);
+
+  const handleSketchChange = useCallback((dataUrl) => {
+    if (!dataUrl) return;
+    setImageUrl(dataUrl);
+  }, []);
 
   const clearWatercolor = useCallback(() => {
     const watercolorCanvas = watercolorCanvasRef.current;
@@ -836,7 +837,7 @@ function App() {
 
   const tabs = [
     { id: 'flow', label: 'Parcours', icon: Sparkles },
-    { id: 'media', label: 'Média', icon: ImageIcon },
+    { id: 'media', label: 'Atelier 2D', icon: Palette },
     { id: 'scene', label: 'Mouvement', icon: Wind },
     { id: 'paint', label: 'Peinture', icon: Palette },
     { id: 'export', label: 'Export', icon: Camera },
@@ -857,11 +858,11 @@ function App() {
               <Sparkles size={18} className="muted-icon" />
             </div>
             <p className="muted">
-              Un atelier en trois temps : poser votre média, sculpter le mouvement, puis enrichir avec peinture et boucle dédiée avant d’exporter en 2D/360° ou VR.
+              Un atelier en quatre temps : dessiner sur un canevas 2D circulaire, sculpter le mouvement, enrichir avec peinture/loopers, puis exporter en 2D/360° ou VR.
             </p>
             <ol className="muted flow-steps">
               <li>
-                <strong>1. Média</strong> — Importez l’image de base puis nettoyez la scène si besoin.
+                <strong>1. Atelier 2D</strong> — Dessinez sur le canevas vierge, utilisez le tampon pour importer une image, puis validez.
               </li>
               <li>
                 <strong>2. Mouvement</strong> — Dessinez les flux/ancres et appliquez un style visuel.
@@ -875,7 +876,7 @@ function App() {
             </ol>
             <div className="inline-actions subtle">
               <button className="pill" type="button" onClick={() => setActiveTab('media')}>
-                <ImageIcon size={16} /> Aller à Média
+                <Palette size={16} /> Aller à Atelier 2D
               </button>
               <button className="pill" type="button" onClick={() => setActiveTab('scene')}>
                 <Wind size={16} /> Aller à Mouvement
@@ -891,35 +892,39 @@ function App() {
         );
       case 'media':
         return (
-          <section className="panel-card">
-            <div className="card-header">
-              <div>
-                <p className="chip">Média</p>
-                <h3>Import & Setup</h3>
+          <>
+            <section className="panel-card">
+              <div className="card-header">
+                <div>
+                  <p className="chip">Atelier 2D</p>
+                  <h3>Canevas circulaire</h3>
+                </div>
+                <Wand2 size={18} className="muted-icon" />
               </div>
-              <Wand2 size={18} className="muted-icon" />
-            </div>
-            <p className="muted">Importez ou remplacez une image source, puis configurez vos flux.</p>
-            <div className="inline-actions">
-              <label className="inline-upload">
-                <Upload size={16} />
-                <span>{imageUrl ? 'Remplacer l’image' : 'Importer une image'}</span>
-                <input type="file" accept="image/*" onChange={handleUpload} />
-              </label>
-              <button
-                className="ghost-button"
-                type="button"
-                onClick={() => {
-                  setPaths([]);
-                  setAnchors([]);
-                  clearWatercolor();
-                }}
-              >
-                <Trash2 size={16} />
-                Réinitialiser la scène
-              </button>
-            </div>
-          </section>
+              <p className="muted">
+                Dessinez librement sur un canevas 2D vierge. Outils inclus : crayon, pinceau, remplir, tampon (import image), gomme, taille et texte, avec undo/redo.
+                Chaque modification alimente immédiatement la scène 3D.
+              </p>
+              <SketchCanvas onChange={handleSketchChange} />
+              <div className="inline-actions subtle">
+                <button
+                  className="ghost-button"
+                  type="button"
+                  onClick={() => {
+                    setPaths([]);
+                    setAnchors([]);
+                    clearWatercolor();
+                  }}
+                >
+                  <Trash2 size={16} />
+                  Nettoyer flux/ancres
+                </button>
+              </div>
+              <p className="muted subtle-text">
+                Le tampon permet d’importer une image puis de la placer où vous voulez. Utilisez la gomme pour retouches fines.
+              </p>
+            </section>
+          </>
         );
       case 'scene':
         return (
@@ -1149,7 +1154,6 @@ function App() {
 
   return (
     <div className="app-shell">
-      <input ref={fileInputRef} type="file" accept="image/*" className="hidden-file-input" onChange={handleUpload} />
       <header className="app-header">
         <div className="branding">
           <div className="logo-chip">
@@ -1204,84 +1208,73 @@ function App() {
               onPointerUp={stopDrawing}
               onPointerCancel={stopDrawing}
             >
-              {imageUrl ? (
-                <div className="canvas-stack">
-                  <canvas ref={canvasRef} width={CANVAS_SIZE} height={CANVAS_SIZE} className="flow-canvas" />
+              <div className="canvas-stack">
+                <canvas ref={canvasRef} width={CANVAS_SIZE} height={CANVAS_SIZE} className="flow-canvas" />
 
-                  <div className="skybox-monitor">
-                    <canvas
-                      ref={(el) => {
-                        if (!el) return;
-                        const draw = () => {
-                          if (masterCanvasRef.current) {
-                            const ctx = el.getContext('2d');
-                            ctx.drawImage(
-                              masterCanvasRef.current,
-                              0,
-                              0,
-                              MASTER_WIDTH,
-                              MASTER_HEIGHT,
-                              0,
-                              0,
-                              el.width,
-                              el.height,
-                            );
-                          }
-                          requestAnimationFrame(draw);
-                        };
-                        draw();
-                      }}
-                      width={240}
-                      height={120}
-                      className="monitor-canvas"
-                    />
-                    <div className="monitor-label">
-                      <Globe size={12} /> 4K Skybox Master
-                    </div>
+                <div className="skybox-monitor">
+                  <canvas
+                    ref={(el) => {
+                      if (!el) return;
+                      const draw = () => {
+                        if (masterCanvasRef.current) {
+                          const ctx = el.getContext('2d');
+                          ctx.drawImage(
+                            masterCanvasRef.current,
+                            0,
+                            0,
+                            MASTER_WIDTH,
+                            MASTER_HEIGHT,
+                            0,
+                            0,
+                            el.width,
+                            el.height,
+                          );
+                        }
+                        requestAnimationFrame(draw);
+                      };
+                      draw();
+                    }}
+                    width={240}
+                    height={120}
+                    className="monitor-canvas"
+                  />
+                  <div className="monitor-label">
+                    <Globe size={12} /> 4K Skybox Master
                   </div>
-
-                  {!isAnimating && (
-                    <svg className="flow-overlay" viewBox="0 0 1000 1000" preserveAspectRatio="none">
-                      {anchors.map((anchor, index) => (
-                        <circle
-                          key={`anchor-${index}`}
-                          cx={anchor.x * 1000}
-                          cy={anchor.y * 1000}
-                          r="15"
-                          fill="#ef4444"
-                          stroke="white"
-                          strokeWidth="4"
-                        />
-                      ))}
-                      {paths.map((path, index) => (
-                        <polyline
-                          // eslint-disable-next-line react/no-array-index-key
-                          key={`path-${index}`}
-                          points={path.map((p) => `${p.x * 1000},${p.y * 1000}`).join(' ')}
-                          fill="none"
-                          stroke="#6366f1"
-                          strokeWidth="30"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          opacity="0.4"
-                        />
-                      ))}
-                    </svg>
-                  )}
-                  {preview2DEnabled && (
-                    <canvas ref={previewCanvasRef} width={PREVIEW_SIZE} height={PREVIEW_SIZE} className="preview-layer" />
-                  )}
                 </div>
-              ) : (
-                <label className="upload-drop">
-                  <Monitor size={72} />
-                  <div>
-                    <p className="eyebrow">Importer Image</p>
-                    <p className="muted">Démarrer une production 360° VR</p>
-                  </div>
-                  <input type="file" accept="image/*" onChange={handleUpload} />
-                </label>
-              )}
+
+                {!isAnimating && (
+                  <svg className="flow-overlay" viewBox="0 0 1000 1000" preserveAspectRatio="none">
+                    {anchors.map((anchor, index) => (
+                      <circle
+                        key={`anchor-${index}`}
+                        cx={anchor.x * 1000}
+                        cy={anchor.y * 1000}
+                        r="15"
+                        fill="#ef4444"
+                        stroke="white"
+                        strokeWidth="4"
+                      />
+                    ))}
+                    {paths.map((path, index) => (
+                      <polyline
+                        // eslint-disable-next-line react/no-array-index-key
+                        key={`path-${index}`}
+                        points={path.map((p) => `${p.x * 1000},${p.y * 1000}`).join(' ')}
+                        fill="none"
+                        stroke="#6366f1"
+                        strokeWidth="30"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        opacity="0.4"
+                      />
+                    ))}
+                  </svg>
+                )}
+                {preview2DEnabled && (
+                  <canvas ref={previewCanvasRef} width={PREVIEW_SIZE} height={PREVIEW_SIZE} className="preview-layer" />
+                )}
+              </div>
             </div>
           </div>
 
@@ -1301,7 +1294,10 @@ function App() {
           hasImage={!!imageUrl}
           isPaintActive={activeTab === 'paint' || tool === 'watercolor'}
           isExportActive={activeTab === 'export'}
-          onImport={() => fileInputRef.current?.click()}
+          onImport={() => {
+            setActiveTab('media');
+            setIsNavOpen(true);
+          }}
           onPaint={() => {
             setTool('watercolor');
             setActiveTab('paint');
