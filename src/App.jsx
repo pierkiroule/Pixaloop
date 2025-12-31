@@ -15,7 +15,6 @@ import {
   Sparkles,
   Stars,
   Trash2,
-  Upload,
   Wand2,
   Wind,
   Zap,
@@ -23,6 +22,7 @@ import {
 import { registerFloatingParticles } from './aframe/particles';
 import './App.css';
 import DrawingLooper from './DrawingLooper';
+import SketchCanvas from './components/SketchCanvas';
 import BottomBar from './components/BottomBar';
 import BottomSheet from './components/BottomSheet';
 import QuickFab from './components/QuickFab';
@@ -228,12 +228,22 @@ const curveTowardVortex = (nextPoint, previousPoint) => {
   return polarToCartesian(easedAngle, Math.min(0.5, easedRadius));
 };
 
+const createBlankBase = () => {
+  const canvas = document.createElement('canvas');
+  canvas.width = CANVAS_SIZE;
+  canvas.height = CANVAS_SIZE;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fdfdf9';
+  ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+  return canvas.toDataURL('image/png');
+};
+
 function App() {
-  const [imageUrl, setImageUrl] = useState(null);
+  const [imageUrl, setImageUrl] = useState(() => createBlankBase());
   const [isAnimating, setIsAnimating] = useState(false);
   const [tool, setTool] = useState('flow');
   const [isNavOpen, setIsNavOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState('scene');
+  const [activeTab, setActiveTab] = useState('media');
   const [isDesktop, setIsDesktop] = useState(false);
   const [watercolorColor, setWatercolorColor] = useState('#6fb0ff');
   const [watercolorSize, setWatercolorSize] = useState(48);
@@ -257,7 +267,6 @@ function App() {
   const sourceCompositeRef = useRef(null);
   const previewCanvasRef = useRef(null);
   const imgRef = useRef(null);
-  const fileInputRef = useRef(null);
   const skyboxVideoRef = useRef(null);
   const panelVideoRef = useRef(null);
   const aframeReady = useRef(null);
@@ -540,29 +549,16 @@ function App() {
     return () => cancelAnimationFrame(engine.current.frameId);
   }, [filterType, isAnimating]);
 
-  const handleUpload = (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const url = URL.createObjectURL(file);
+  useEffect(() => {
+    if (!imageUrl) return;
     const tempImg = new Image();
     tempImg.onload = () => {
       imgRef.current = tempImg;
-      setImageUrl(url);
-      setPaths([]);
-      setAnchors([]);
-      const watercolorCanvas = watercolorCanvasRef.current;
-      watercolorCanvas?.getContext('2d')?.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-    };
-    tempImg.src = url;
-  };
-
-  useEffect(() => {
-    if (imageUrl && canvasRef.current && imgRef.current) {
-      setupWebGL(imgRef.current);
+      setupWebGL(tempImg);
       updateFlowMap();
       refreshSourceTexture();
-    }
+    };
+    tempImg.src = imageUrl;
   }, [imageUrl, refreshSourceTexture, setupWebGL, updateFlowMap]);
 
   useEffect(() => {
@@ -570,6 +566,11 @@ function App() {
       updateFlowMap();
     }
   }, [anchors, paths, imageUrl, updateFlowMap]);
+
+  const handleSketchChange = useCallback((dataUrl) => {
+    if (!dataUrl) return;
+    setImageUrl(dataUrl);
+  }, []);
 
   const clearWatercolor = useCallback(() => {
     const watercolorCanvas = watercolorCanvasRef.current;
@@ -835,7 +836,8 @@ function App() {
   }, []);
 
   const tabs = [
-    { id: 'media', label: 'Média', icon: ImageIcon },
+    { id: 'flow', label: 'Parcours', icon: Sparkles },
+    { id: 'media', label: 'Atelier 2D', icon: Palette },
     { id: 'scene', label: 'Mouvement', icon: Wind },
     { id: 'paint', label: 'Peinture', icon: Palette },
     { id: 'export', label: 'Export', icon: Camera },
@@ -845,37 +847,84 @@ function App() {
 
   const renderSheetContent = () => {
     switch (activeTab) {
-      case 'media':
+      case 'flow':
         return (
           <section className="panel-card">
             <div className="card-header">
               <div>
-                <p className="chip">Média</p>
-                <h3>Import & Setup</h3>
+                <p className="chip">Guide</p>
+                <h3>Principe & Flow</h3>
               </div>
-              <Wand2 size={18} className="muted-icon" />
+              <Sparkles size={18} className="muted-icon" />
             </div>
-            <p className="muted">Importez ou remplacez une image source, puis configurez vos flux.</p>
-            <div className="inline-actions">
-              <label className="inline-upload">
-                <Upload size={16} />
-                <span>{imageUrl ? 'Remplacer l’image' : 'Importer une image'}</span>
-                <input type="file" accept="image/*" onChange={handleUpload} />
-              </label>
-              <button
-                className="ghost-button"
-                type="button"
-                onClick={() => {
-                  setPaths([]);
-                  setAnchors([]);
-                  clearWatercolor();
-                }}
-              >
-                <Trash2 size={16} />
-                Réinitialiser la scène
+            <p className="muted">
+              Un atelier en quatre temps : dessiner sur un canevas 2D circulaire, sculpter le mouvement, enrichir avec peinture/loopers, puis exporter en 2D/360° ou VR.
+            </p>
+            <ol className="muted flow-steps">
+              <li>
+                <strong>1. Atelier 2D</strong> — Dessinez sur le canevas vierge, utilisez le tampon pour importer une image, puis validez.
+              </li>
+              <li>
+                <strong>2. Mouvement</strong> — Dessinez les flux/ancres et appliquez un style visuel.
+              </li>
+              <li>
+                <strong>3. Peinture</strong> — Ajoutez l’aquarelle et générez la boucle looper 15s (export 30s) dédiée au panneau ou à la skybox.
+              </li>
+              <li>
+                <strong>4. Export</strong> — Lancez l’animation, exportez en 2D/360°, ou routez la boucle dans la bulle VR/Skybox.
+              </li>
+            </ol>
+            <div className="inline-actions subtle">
+              <button className="pill" type="button" onClick={() => setActiveTab('media')}>
+                <Palette size={16} /> Aller à Atelier 2D
+              </button>
+              <button className="pill" type="button" onClick={() => setActiveTab('scene')}>
+                <Wind size={16} /> Aller à Mouvement
+              </button>
+              <button className="pill" type="button" onClick={() => setActiveTab('paint')}>
+                <Palette size={16} /> Aller à Peinture
+              </button>
+              <button className="pill" type="button" onClick={() => setActiveTab('export')}>
+                <Camera size={16} /> Aller à Export
               </button>
             </div>
           </section>
+        );
+      case 'media':
+        return (
+          <>
+            <section className="panel-card">
+              <div className="card-header">
+                <div>
+                  <p className="chip">Atelier 2D</p>
+                  <h3>Canevas circulaire</h3>
+                </div>
+                <Wand2 size={18} className="muted-icon" />
+              </div>
+              <p className="muted">
+                Dessinez librement sur un canevas 2D vierge. Outils inclus : crayon, pinceau, remplir, tampon (import image), gomme, taille et texte, avec undo/redo.
+                Chaque modification alimente immédiatement la scène 3D.
+              </p>
+              <SketchCanvas onChange={handleSketchChange} />
+              <div className="inline-actions subtle">
+                <button
+                  className="ghost-button"
+                  type="button"
+                  onClick={() => {
+                    setPaths([]);
+                    setAnchors([]);
+                    clearWatercolor();
+                  }}
+                >
+                  <Trash2 size={16} />
+                  Nettoyer flux/ancres
+                </button>
+              </div>
+              <p className="muted subtle-text">
+                Le tampon permet d’importer une image puis de la placer où vous voulez. Utilisez la gomme pour retouches fines.
+              </p>
+            </section>
+          </>
         );
       case 'scene':
         return (
@@ -935,78 +984,94 @@ function App() {
         );
       case 'paint':
         return (
-          <section className="panel-card">
-            <div className="card-header">
-              <div>
-                <p className="chip">Peinture</p>
-                <h3>Pinceau Aquarelle</h3>
+          <>
+            <section className="panel-card">
+              <div className="card-header">
+                <div>
+                  <p className="chip">Peinture</p>
+                  <h3>Pinceau Aquarelle</h3>
+                </div>
+                <Palette size={18} className="muted-icon" />
               </div>
-              <Palette size={18} className="muted-icon" />
-            </div>
-            <p className="muted">
-              Ajoutez des touches aquarelle directement sur la scène. Ces lavis seront animés et présents dans vos exports vidéo.
-            </p>
-            {imageUrl ? (
-              <>
-                <div className="inline-actions">
-                  <button
-                    type="button"
-                    className={`primary-control ${tool === 'watercolor' ? 'active' : ''}`}
-                    onClick={() => setTool('watercolor')}
-                  >
-                    <Droplets size={16} /> Activer le pinceau
-                  </button>
-                  <button type="button" className="ghost-button" onClick={clearWatercolor}>
-                    <Trash2 size={16} /> Nettoyer la couche
-                  </button>
-                </div>
-                <div className="color-palette">
-                  {watercolorPalette.map((color) => (
+              <p className="muted">
+                Ajoutez des touches aquarelle directement sur la scène. Ces lavis seront animés et présents dans vos exports vidéo.
+              </p>
+              {imageUrl ? (
+                <>
+                  <div className="inline-actions">
                     <button
-                      key={color}
                       type="button"
-                      className={`color-chip ${watercolorColor === color ? 'active' : ''}`}
-                      style={{ backgroundColor: color }}
-                      onClick={() => setWatercolorColor(color)}
-                      aria-label={`Couleur ${color}`}
+                      className={`primary-control ${tool === 'watercolor' ? 'active' : ''}`}
+                      onClick={() => setTool('watercolor')}
+                    >
+                      <Droplets size={16} /> Activer le pinceau
+                    </button>
+                    <button type="button" className="ghost-button" onClick={clearWatercolor}>
+                      <Trash2 size={16} /> Nettoyer la couche
+                    </button>
+                  </div>
+                  <div className="color-palette">
+                    {watercolorPalette.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        className={`color-chip ${watercolorColor === color ? 'active' : ''}`}
+                        style={{ backgroundColor: color }}
+                        onClick={() => setWatercolorColor(color)}
+                        aria-label={`Couleur ${color}`}
+                      />
+                    ))}
+                  </div>
+                  <div className="slider-field">
+                    <label htmlFor="brush-size">
+                      Taille du pinceau
+                      <span>{Math.round(watercolorSize)} px</span>
+                    </label>
+                    <input
+                      id="brush-size"
+                      type="range"
+                      min="20"
+                      max="120"
+                      step="2"
+                      value={watercolorSize}
+                      onChange={(e) => setWatercolorSize(Number(e.target.value))}
                     />
-                  ))}
+                  </div>
+                  <div className="slider-field">
+                    <label htmlFor="brush-wet">
+                      Humidité
+                      <span>{Math.round(watercolorWetness * 100)}%</span>
+                    </label>
+                    <input
+                      id="brush-wet"
+                      type="range"
+                      min="0.25"
+                      max="1"
+                      step="0.05"
+                      value={watercolorWetness}
+                      onChange={(e) => setWatercolorWetness(Number(e.target.value))}
+                    />
+                  </div>
+                </>
+              ) : (
+                <p className="muted subtle-text">Importez une image pour activer le pinceau aquarelle.</p>
+              )}
+            </section>
+            <section className="panel-card looper-card">
+              <div className="card-header">
+                <div>
+                  <p className="chip">Looper</p>
+                  <h3>Canvas 15s en boucle</h3>
                 </div>
-                <div className="slider-field">
-                  <label htmlFor="brush-size">
-                    Taille du pinceau
-                    <span>{Math.round(watercolorSize)} px</span>
-                  </label>
-                  <input
-                    id="brush-size"
-                    type="range"
-                    min="20"
-                    max="120"
-                    step="2"
-                    value={watercolorSize}
-                    onChange={(e) => setWatercolorSize(Number(e.target.value))}
-                  />
-                </div>
-                <div className="slider-field">
-                  <label htmlFor="brush-wet">
-                    Humidité
-                    <span>{Math.round(watercolorWetness * 100)}%</span>
-                  </label>
-                  <input
-                    id="brush-wet"
-                    type="range"
-                    min="0.25"
-                    max="1"
-                    step="0.05"
-                    value={watercolorWetness}
-                    onChange={(e) => setWatercolorWetness(Number(e.target.value))}
-                  />
-                </div>
-              </>
-            ) : (
-              <p className="muted subtle-text">Importez une image pour activer le pinceau aquarelle.</p>
-            )}
-          </section>
+                <Sparkles size={18} className="muted-icon" />
+              </div>
+              <p className="muted">
+                Dessinez/redessinez sur le canvas dédié et prévisualisez la boucle 15s (export 30s). Parfait pour nourrir la skybox 360 ou un panneau VR.
+              </p>
+              <DrawingLooper onLoopReady={handleLooperReady} />
+              {!looperVideoUrl && <p className="muted subtle-text">Générez une boucle pour l’activer dans l’onglet Export.</p>}
+            </section>
+          </>
         );
       case 'export':
         return (
@@ -1073,20 +1138,9 @@ function App() {
                   <Sparkles size={16} /> Skybox Looper
                 </button>
               </div>
-            </section>
-            <section className="panel-card looper-card">
-              <div className="card-header">
-                <div>
-                  <p className="chip">Nouveau</p>
-                  <h3>Drawing Looper</h3>
-                </div>
-                <Sparkles size={18} className="muted-icon" />
-              </div>
-              <p className="muted">
-                Créez une boucle ping-pong 5s pour servir de texture skybox ou panneau VR. L’export 10s se télécharge et peut être routé vers la bulle VR.
+              <p className="muted subtle-text">
+                Créez votre boucle dans l’onglet Peinture, puis activez-la ici pour la skybox ou un panneau 2D/360°.
               </p>
-              <DrawingLooper onLoopReady={handleLooperReady} />
-              {!looperVideoUrl && <p className="muted subtle-text">Générez une boucle pour activer le routage VR.</p>}
             </section>
           </>
         );
@@ -1100,7 +1154,6 @@ function App() {
 
   return (
     <div className="app-shell">
-      <input ref={fileInputRef} type="file" accept="image/*" className="hidden-file-input" onChange={handleUpload} />
       <header className="app-header">
         <div className="branding">
           <div className="logo-chip">
@@ -1155,84 +1208,73 @@ function App() {
               onPointerUp={stopDrawing}
               onPointerCancel={stopDrawing}
             >
-              {imageUrl ? (
-                <div className="canvas-stack">
-                  <canvas ref={canvasRef} width={CANVAS_SIZE} height={CANVAS_SIZE} className="flow-canvas" />
+              <div className="canvas-stack">
+                <canvas ref={canvasRef} width={CANVAS_SIZE} height={CANVAS_SIZE} className="flow-canvas" />
 
-                  <div className="skybox-monitor">
-                    <canvas
-                      ref={(el) => {
-                        if (!el) return;
-                        const draw = () => {
-                          if (masterCanvasRef.current) {
-                            const ctx = el.getContext('2d');
-                            ctx.drawImage(
-                              masterCanvasRef.current,
-                              0,
-                              0,
-                              MASTER_WIDTH,
-                              MASTER_HEIGHT,
-                              0,
-                              0,
-                              el.width,
-                              el.height,
-                            );
-                          }
-                          requestAnimationFrame(draw);
-                        };
-                        draw();
-                      }}
-                      width={240}
-                      height={120}
-                      className="monitor-canvas"
-                    />
-                    <div className="monitor-label">
-                      <Globe size={12} /> 4K Skybox Master
-                    </div>
+                <div className="skybox-monitor">
+                  <canvas
+                    ref={(el) => {
+                      if (!el) return;
+                      const draw = () => {
+                        if (masterCanvasRef.current) {
+                          const ctx = el.getContext('2d');
+                          ctx.drawImage(
+                            masterCanvasRef.current,
+                            0,
+                            0,
+                            MASTER_WIDTH,
+                            MASTER_HEIGHT,
+                            0,
+                            0,
+                            el.width,
+                            el.height,
+                          );
+                        }
+                        requestAnimationFrame(draw);
+                      };
+                      draw();
+                    }}
+                    width={240}
+                    height={120}
+                    className="monitor-canvas"
+                  />
+                  <div className="monitor-label">
+                    <Globe size={12} /> 4K Skybox Master
                   </div>
-
-                  {!isAnimating && (
-                    <svg className="flow-overlay" viewBox="0 0 1000 1000" preserveAspectRatio="none">
-                      {anchors.map((anchor, index) => (
-                        <circle
-                          key={`anchor-${index}`}
-                          cx={anchor.x * 1000}
-                          cy={anchor.y * 1000}
-                          r="15"
-                          fill="#ef4444"
-                          stroke="white"
-                          strokeWidth="4"
-                        />
-                      ))}
-                      {paths.map((path, index) => (
-                        <polyline
-                          // eslint-disable-next-line react/no-array-index-key
-                          key={`path-${index}`}
-                          points={path.map((p) => `${p.x * 1000},${p.y * 1000}`).join(' ')}
-                          fill="none"
-                          stroke="#6366f1"
-                          strokeWidth="30"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          opacity="0.4"
-                        />
-                      ))}
-                    </svg>
-                  )}
-                  {preview2DEnabled && (
-                    <canvas ref={previewCanvasRef} width={PREVIEW_SIZE} height={PREVIEW_SIZE} className="preview-layer" />
-                  )}
                 </div>
-              ) : (
-                <label className="upload-drop">
-                  <Monitor size={72} />
-                  <div>
-                    <p className="eyebrow">Importer Image</p>
-                    <p className="muted">Démarrer une production 360° VR</p>
-                  </div>
-                  <input type="file" accept="image/*" onChange={handleUpload} />
-                </label>
-              )}
+
+                {!isAnimating && (
+                  <svg className="flow-overlay" viewBox="0 0 1000 1000" preserveAspectRatio="none">
+                    {anchors.map((anchor, index) => (
+                      <circle
+                        key={`anchor-${index}`}
+                        cx={anchor.x * 1000}
+                        cy={anchor.y * 1000}
+                        r="15"
+                        fill="#ef4444"
+                        stroke="white"
+                        strokeWidth="4"
+                      />
+                    ))}
+                    {paths.map((path, index) => (
+                      <polyline
+                        // eslint-disable-next-line react/no-array-index-key
+                        key={`path-${index}`}
+                        points={path.map((p) => `${p.x * 1000},${p.y * 1000}`).join(' ')}
+                        fill="none"
+                        stroke="#6366f1"
+                        strokeWidth="30"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        opacity="0.4"
+                      />
+                    ))}
+                  </svg>
+                )}
+                {preview2DEnabled && (
+                  <canvas ref={previewCanvasRef} width={PREVIEW_SIZE} height={PREVIEW_SIZE} className="preview-layer" />
+                )}
+              </div>
             </div>
           </div>
 
@@ -1252,7 +1294,10 @@ function App() {
           hasImage={!!imageUrl}
           isPaintActive={activeTab === 'paint' || tool === 'watercolor'}
           isExportActive={activeTab === 'export'}
-          onImport={() => fileInputRef.current?.click()}
+          onImport={() => {
+            setActiveTab('media');
+            setIsNavOpen(true);
+          }}
           onPaint={() => {
             setTool('watercolor');
             setActiveTab('paint');
